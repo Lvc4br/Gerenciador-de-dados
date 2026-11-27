@@ -243,11 +243,91 @@ fn list_files(
     Ok(FilePage { items, total })
 }
 
+
+#[derive(Serialize)]
+struct DiscrepancyRecord {
+    id: i64,
+    filename: String,
+    branch: String,
+    number_in_filename: String,
+    number_in_titleblock: String,
+    revision: String,
+    extracted_title: String,
+    title_for_titleblock_number: String,
+    diagnosis: String,
+    artesp_number: String,
+    internal_number: String,
+    source_row: i64,
+    source_csv: String,
+}
+
+#[derive(Serialize)]
+struct DiscrepancyPage {
+    items: Vec<DiscrepancyRecord>,
+    total: u64,
+}
+
+#[tauri::command]
+fn list_discrepancies(
+    app: tauri::AppHandle,
+    search: Option<String>,
+    limit: Option<u32>,
+    offset: Option<u32>,
+) -> Result<DiscrepancyPage, String> {
+    let connection = open_database(&app)?;
+    let search = search.unwrap_or_default().trim().to_string();
+    let pattern = format!("%{}%", search.replace('%', "\\%").replace('_', "\\_"));
+    let total: u64 = connection.query_row(
+        "SELECT COUNT(*) FROM drawing_discrepancies d
+         WHERE (?1 = '' OR d.filename LIKE ?2 ESCAPE '\\'
+           OR d.branch LIKE ?2 ESCAPE '\\' OR d.diagnosis LIKE ?2 ESCAPE '\\'
+           OR d.extracted_title LIKE ?2 ESCAPE '\\'
+           OR d.title_for_titleblock_number LIKE ?2 ESCAPE '\\')",
+        params![search, pattern], |row| row.get(0)
+    ).map_err(|e| e.to_string())?;
+
+    let mut statement = connection.prepare(
+        "SELECT d.id, d.filename, d.branch, d.number_in_filename,
+                d.number_in_titleblock, d.revision, d.extracted_title,
+                d.title_for_titleblock_number, d.diagnosis, d.artesp_number,
+                d.internal_number, d.source_row, f.filename
+         FROM drawing_discrepancies d
+         JOIN files f ON f.id = d.source_file_id
+         WHERE (?1 = '' OR d.filename LIKE ?2 ESCAPE '\\'
+           OR d.branch LIKE ?2 ESCAPE '\\' OR d.diagnosis LIKE ?2 ESCAPE '\\'
+           OR d.extracted_title LIKE ?2 ESCAPE '\\'
+           OR d.title_for_titleblock_number LIKE ?2 ESCAPE '\\')
+         ORDER BY d.branch ASC, d.filename ASC
+         LIMIT ?3 OFFSET ?4"
+    ).map_err(|e| e.to_string())?;
+    let rows = statement.query_map(
+        params![search, pattern, limit.unwrap_or(100).clamp(1, 500), offset.unwrap_or(0)],
+        |row| Ok(DiscrepancyRecord {
+            id: row.get(0)?,
+            filename: row.get(1)?,
+            branch: row.get(2)?,
+            number_in_filename: row.get(3)?,
+            number_in_titleblock: row.get(4)?,
+            revision: row.get(5)?,
+            extracted_title: row.get(6)?,
+            title_for_titleblock_number: row.get(7)?,
+            diagnosis: row.get(8)?,
+            artesp_number: row.get(9)?,
+            internal_number: row.get(10)?,
+            source_row: row.get(11)?,
+            source_csv: row.get(12)?,
+        })
+    ).map_err(|e| e.to_string())?;
+    let mut items = Vec::new();
+    for row in rows { items.push(row.map_err(|e| e.to_string())?); }
+    Ok(DiscrepancyPage { items, total })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![scan_folder, get_dashboard_stats, list_files])
+        .invoke_handler(tauri::generate_handler![scan_folder, get_dashboard_stats, list_files, list_discrepancies])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar o GED Desktop");
 }
