@@ -394,3 +394,52 @@ pub fn set_project_file_link(connection: &Connection, project_id: i64, file_id: 
     connection.execute("UPDATE projects SET updated_at=CURRENT_TIMESTAMP WHERE id=?1",params![project_id]).map_err(|e|e.to_string())?;
     Ok(())
 }
+
+
+#[cfg(test)]
+mod relationship_tests {
+    use super::*;
+
+    fn db() -> Connection {
+        let connection = Connection::open_in_memory().unwrap();
+        connection.execute_batch(
+            "PRAGMA foreign_keys=ON;
+             CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY,name TEXT NOT NULL);
+             CREATE TABLE scan_roots(id INTEGER PRIMARY KEY,path TEXT NOT NULL UNIQUE,added_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+             CREATE TABLE files(
+               id INTEGER PRIMARY KEY,root_id INTEGER NOT NULL REFERENCES scan_roots(id),
+               relative_path TEXT NOT NULL,filename TEXT NOT NULL,extension TEXT NOT NULL DEFAULT '',
+               byte_size INTEGER NOT NULL DEFAULT 0,modified_at TEXT NOT NULL DEFAULT '',
+               sha256 TEXT NOT NULL DEFAULT '',status TEXT NOT NULL DEFAULT 'indexed',
+               UNIQUE(root_id,relative_path)
+             );"
+        ).unwrap();
+        ensure_schema(&connection).unwrap();
+        ensure_relations_schema(&connection).unwrap();
+        connection
+    }
+
+    #[test]
+    fn discipline_and_document_links_are_scoped_to_project() {
+        let connection = db();
+        create(&connection,"P1","Projeto 1","","").unwrap();
+        create(&connection,"P2","Projeto 2","","").unwrap();
+        let discipline = save_discipline(&connection,1,None,"est","Estruturas",1).unwrap();
+        assert!(save_discipline(&connection,1,None,"EST","Outra",2).is_err());
+        connection.execute("INSERT INTO scan_roots(path) VALUES ('C:/P1')",[]).unwrap();
+        connection.execute(
+            "INSERT INTO files(root_id,relative_path,filename,extension,byte_size,sha256,status)
+             VALUES (1,'Estruturas/A.pdf','A.pdf','pdf',100,'abc','indexed')",[]
+        ).unwrap();
+        set_project_file_link(&connection,1,1,true,Some(discipline)).unwrap();
+        assert!(set_project_file_link(&connection,2,1,true,Some(discipline)).is_err());
+        let (files,total) = list_project_files(&connection,1,"",Some(discipline),100,0).unwrap();
+        assert_eq!(total,1);
+        assert_eq!(files[0].discipline_code.as_deref(),Some("EST"));
+        delete_discipline(&connection,1,discipline).unwrap();
+        let discipline_id: Option<i64> = connection.query_row(
+            "SELECT discipline_id FROM project_file_links WHERE project_id=1 AND file_id=1",[],|r|r.get(0)
+        ).unwrap();
+        assert_eq!(discipline_id,None);
+    }
+}
