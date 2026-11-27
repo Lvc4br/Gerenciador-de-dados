@@ -32,6 +32,18 @@ Atalho: com a pasta raiz aberta no VS Code, use **Terminal → Executar Tarefa..
 
 Na prévia, é possível navegar pela Visão geral, Explorador e Divergências, testar pesquisa, filtros, ordenação e paginação. Os botões de importação, backup e restauração explicam que essas operações exigem o aplicativo desktop. Os dados exibidos são fictícios e não devem ser usados como registros de engenharia.
 
+### Atalho portátil para computadores sem administrador
+
+Se o Windows não permitir instalar Node.js, use o script incluído no repositório. Ele baixa uma versão ZIP portátil do Node.js para `%LOCALAPPDATA%\GED-Portable`, sem instalar no sistema nem exigir elevação de privilégios.
+
+Na raiz do repositório, execute:
+
+```powershell
+.\scripts\preview-portable.ps1
+```
+
+Na primeira execução, o script baixa o Node.js e instala as dependências do projeto. Nas próximas execuções, reutiliza os arquivos já baixados. A janela do PowerShell deve permanecer aberta enquanto a prévia estiver em uso. É necessário que a rede permita acessar nodejs.org e o registro npm.
+
 ## Executar o aplicativo desktop real em desenvolvimento
 
 Para testar o backend Rust, SQLite, diálogos nativos e indexação de pastas, instale também Rust stable/MSVC, C++ Build Tools e WebView2 Runtime. No terminal, entre em `apps/desktop`:
