@@ -522,7 +522,7 @@ type FilenameSuggestion = {
   id: number; file_id: number; filename: string; relative_path: string;
   project_prefix: string | null; discipline_code: string | null;
   drawing_number: string | null; revision: string | null;
-  confidence: number; status: "pending" | "accepted" | "rejected"; applied: boolean; titleblock_internal_number: string | null; titleblock_artesp_number: string | null; titleblock_title: string | null;
+  confidence: number; source: string; status: "pending" | "accepted" | "rejected"; applied: boolean; titleblock_internal_number: string | null; titleblock_artesp_number: string | null; titleblock_title: string | null;
   pdf_drawing_number: string | null; pdf_revision: string | null; pdf_title: string | null; pdf_confidence: number; created_at: string;
 };
 type SuggestionPage = { items: FilenameSuggestion[]; total: number };
@@ -576,7 +576,7 @@ function ReviewPanel() {
       <div className="surface-card">
         {data.items.map(item => (
           <article className="review-item" key={item.id}>
-            <div className="review-item-heading"><div><b>{item.filename}</b><small>{item.relative_path}</small></div><span className={"file-status " + (item.status === "pending" ? "skipped" : item.status === "accepted" ? "indexed" : "missing")}>{item.status === "pending" ? "Pendente" : item.status === "accepted" ? "Aceita" : "Rejeitada"}</span></div>
+            <div className="review-item-heading"><div><b>{item.filename}</b><small>{item.relative_path} · Origem da sugestão: {item.source === "pdf_content" ? "texto do PDF" : "nome do arquivo"}</small></div><span className={"file-status " + (item.status === "pending" ? "skipped" : item.status === "accepted" ? "indexed" : "missing")}>{item.status === "pending" ? "Pendente" : item.status === "accepted" ? "Aceita" : "Rejeitada"}</span></div>
             <div className="review-metadata">
               <div><small>Projeto provável</small><b>{item.project_prefix || "—"}</b></div>
               <div><small>Disciplina</small><b>{item.discipline_code || "—"}</b></div>
