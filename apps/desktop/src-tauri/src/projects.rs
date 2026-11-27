@@ -218,3 +218,179 @@ mod tests {
         assert_eq!(status,"archived");
     }
 }
+
+
+#[derive(Serialize)]
+pub struct ProjectDisciplineRecord {
+    pub id: i64,
+    pub project_id: i64,
+    pub code: String,
+    pub name: String,
+    pub sort_order: i64,
+}
+
+#[derive(Serialize)]
+pub struct ProjectFileRecord {
+    pub id: i64,
+    pub filename: String,
+    pub relative_path: String,
+    pub extension: String,
+    pub byte_size: i64,
+    pub modified_at: String,
+    pub sha256: String,
+    pub root_path: String,
+    pub status: String,
+    pub linked: bool,
+    pub discipline_id: Option<i64>,
+    pub discipline_code: Option<String>,
+    pub discipline_name: Option<String>,
+}
+
+pub fn ensure_relations_schema(connection: &Connection) -> Result<(), String> {
+    let applied: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM schema_migrations WHERE version=5", [], |row| row.get(0)
+    ).map_err(|e| e.to_string())?;
+    if applied > 0 { return Ok(()); }
+    let transaction = connection.unchecked_transaction().map_err(|e| e.to_string())?;
+    transaction.execute_batch(
+        "CREATE TABLE IF NOT EXISTS project_file_links (
+           project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+           file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+           discipline_id INTEGER REFERENCES project_disciplines(id) ON DELETE SET NULL,
+           source TEXT NOT NULL DEFAULT 'manual' CHECK(source IN ('manual','rule')),
+           confidence REAL,
+           linked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+           PRIMARY KEY(project_id,file_id)
+         );
+         CREATE INDEX IF NOT EXISTS idx_project_file_links_discipline
+           ON project_file_links(project_id,discipline_id);
+         INSERT INTO schema_migrations(version,name)
+           VALUES (5,'project_document_relationships');"
+    ).map_err(|e| e.to_string())?;
+    transaction.commit().map_err(|e| e.to_string())
+}
+
+pub fn list_disciplines(connection: &Connection, project_id: i64) -> Result<Vec<ProjectDisciplineRecord>, String> {
+    let mut statement = connection.prepare(
+        "SELECT id,project_id,code,name,sort_order FROM project_disciplines
+         WHERE project_id=?1 ORDER BY sort_order,name COLLATE NOCASE"
+    ).map_err(|e| e.to_string())?;
+    let rows = statement.query_map(params![project_id], |row| Ok(ProjectDisciplineRecord {
+        id: row.get(0)?, project_id: row.get(1)?, code: row.get(2)?,
+        name: row.get(3)?, sort_order: row.get(4)?
+    })).map_err(|e| e.to_string())?;
+    let mut items = Vec::new();
+    for row in rows { items.push(row.map_err(|e| e.to_string())?); }
+    Ok(items)
+}
+
+pub fn save_discipline(connection: &Connection, project_id: i64, id: Option<i64>, code: &str, name: &str, sort_order: i64) -> Result<i64, String> {
+    let code = code.trim().to_uppercase();
+    let name = name.trim();
+    if code.is_empty() || name.is_empty() {
+        return Err("Código e nome da disciplina são obrigatórios.".into());
+    }
+    if code.chars().count() > 30 || name.chars().count() > 100 {
+        return Err("Código ou nome da disciplina excede o limite permitido.".into());
+    }
+    let exists: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM projects WHERE id=?1)", params![project_id], |row| row.get(0)
+    ).map_err(|e| e.to_string())?;
+    if !exists { return Err("Projeto não encontrado.".into()); }
+    if let Some(id) = id {
+        let changed = connection.execute(
+            "UPDATE project_disciplines SET code=?1,name=?2,sort_order=?3 WHERE id=?4 AND project_id=?5",
+            params![code,name,sort_order,id,project_id]
+        ).map_err(|error| {
+            if error.to_string().contains("UNIQUE constraint failed") {
+                "Já existe uma disciplina com esse código neste projeto.".to_string()
+            } else { error.to_string() }
+        })?;
+        if changed == 0 { return Err("Disciplina não encontrada neste projeto.".into()); }
+        Ok(id)
+    } else {
+        connection.execute(
+            "INSERT INTO project_disciplines(project_id,code,name,sort_order) VALUES (?1,?2,?3,?4)",
+            params![project_id,code,name,sort_order]
+        ).map_err(|error| {
+            if error.to_string().contains("UNIQUE constraint failed") {
+                "Já existe uma disciplina com esse código neste projeto.".to_string()
+            } else { error.to_string() }
+        })?;
+        Ok(connection.last_insert_rowid())
+    }
+}
+
+pub fn delete_discipline(connection: &Connection, project_id: i64, discipline_id: i64) -> Result<(), String> {
+    let changed = connection.execute(
+        "DELETE FROM project_disciplines WHERE id=?1 AND project_id=?2",
+        params![discipline_id,project_id]
+    ).map_err(|e| e.to_string())?;
+    if changed == 0 { return Err("Disciplina não encontrada neste projeto.".into()); }
+    Ok(())
+}
+
+pub fn list_project_files(connection: &Connection, project_id: i64, search: &str, discipline_id: Option<i64>, limit: u32, offset: u32) -> Result<(Vec<ProjectFileRecord>,u64),String> {
+    let search = search.trim();
+    let pattern = format!("%{}%", search.replace('%', "\\%").replace('_', "\\_"));
+    let total: u64 = connection.query_row(
+        "SELECT COUNT(*) FROM files f
+         LEFT JOIN project_roots pr ON pr.root_id=f.root_id AND pr.project_id=?1
+         LEFT JOIN project_file_links pfl ON pfl.file_id=f.id AND pfl.project_id=?1
+         WHERE f.status='indexed' AND (pr.project_id IS NOT NULL OR pfl.project_id IS NOT NULL)
+           AND (?2='' OR f.filename LIKE ?3 ESCAPE '\\' OR f.relative_path LIKE ?3 ESCAPE '\\')
+           AND (?4 IS NULL OR pfl.discipline_id=?4)",
+        params![project_id,search,pattern,discipline_id], |row| row.get(0)
+    ).map_err(|e| e.to_string())?;
+    let mut statement = connection.prepare(
+        "SELECT f.id,f.filename,f.relative_path,f.extension,f.byte_size,f.modified_at,f.sha256,r.path,f.status,
+           CASE WHEN pfl.project_id IS NULL THEN 0 ELSE 1 END,pfl.discipline_id,d.code,d.name
+         FROM files f JOIN scan_roots r ON r.id=f.root_id
+         LEFT JOIN project_roots pr ON pr.root_id=f.root_id AND pr.project_id=?1
+         LEFT JOIN project_file_links pfl ON pfl.file_id=f.id AND pfl.project_id=?1
+         LEFT JOIN project_disciplines d ON d.id=pfl.discipline_id
+         WHERE f.status='indexed' AND (pr.project_id IS NOT NULL OR pfl.project_id IS NOT NULL)
+           AND (?2='' OR f.filename LIKE ?3 ESCAPE '\\' OR f.relative_path LIKE ?3 ESCAPE '\\')
+           AND (?4 IS NULL OR pfl.discipline_id=?4)
+         ORDER BY f.relative_path COLLATE NOCASE LIMIT ?5 OFFSET ?6"
+    ).map_err(|e| e.to_string())?;
+    let rows = statement.query_map(
+        params![project_id,search,pattern,discipline_id,limit.clamp(1,500),offset],
+        |row| Ok(ProjectFileRecord {
+            id: row.get(0)?, filename: row.get(1)?, relative_path: row.get(2)?,
+            extension: row.get(3)?, byte_size: row.get(4)?, modified_at: row.get(5)?,
+            sha256: row.get(6)?, root_path: row.get(7)?, status: row.get(8)?,
+            linked: row.get::<_,i64>(9)? == 1, discipline_id: row.get(10)?,
+            discipline_code: row.get(11)?, discipline_name: row.get(12)?
+        })
+    ).map_err(|e| e.to_string())?;
+    let mut items = Vec::new();
+    for row in rows { items.push(row.map_err(|e| e.to_string())?); }
+    Ok((items,total))
+}
+
+pub fn set_project_file_link(connection: &Connection, project_id: i64, file_id: i64, linked: bool, discipline_id: Option<i64>) -> Result<(),String> {
+    let project_exists: bool = connection.query_row("SELECT EXISTS(SELECT 1 FROM projects WHERE id=?1)",params![project_id],|r|r.get(0)).map_err(|e|e.to_string())?;
+    if !project_exists { return Err("Projeto não encontrado.".into()); }
+    let file_exists: bool = connection.query_row("SELECT EXISTS(SELECT 1 FROM files WHERE id=?1)",params![file_id],|r|r.get(0)).map_err(|e|e.to_string())?;
+    if !file_exists { return Err("Documento não encontrado na biblioteca.".into()); }
+    if let Some(discipline_id) = discipline_id {
+        let valid: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM project_disciplines WHERE id=?1 AND project_id=?2)",
+            params![discipline_id,project_id],|r|r.get(0)
+        ).map_err(|e|e.to_string())?;
+        if !valid { return Err("A disciplina selecionada não pertence ao projeto.".into()); }
+    }
+    if linked {
+        connection.execute(
+            "INSERT INTO project_file_links(project_id,file_id,discipline_id,source)
+             VALUES (?1,?2,?3,'manual')
+             ON CONFLICT(project_id,file_id) DO UPDATE SET discipline_id=excluded.discipline_id,source='manual',linked_at=CURRENT_TIMESTAMP",
+            params![project_id,file_id,discipline_id]
+        ).map_err(|e|e.to_string())?;
+    } else {
+        connection.execute("DELETE FROM project_file_links WHERE project_id=?1 AND file_id=?2",params![project_id,file_id]).map_err(|e|e.to_string())?;
+    }
+    connection.execute("UPDATE projects SET updated_at=CURRENT_TIMESTAMP WHERE id=?1",params![project_id]).map_err(|e|e.to_string())?;
+    Ok(())
+}
