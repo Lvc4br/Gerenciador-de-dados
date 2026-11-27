@@ -5,7 +5,7 @@
 **Plataforma definida:** Windows 10 ou superior, x64.  
 **Uso inicial:** um engenheiro, um computador, operação local/offline.
 
-> Esta é uma auditoria estática do estado do repositório. Não equivale a teste funcional em Windows, teste de carga, análise de segurança independente ou validação dos formatos CAD/BIM. O workflow de CI consultado ainda estava na fila; portanto, não há aprovação de build registrada nesta revisão.
+> Esta é uma auditoria estática do estado do repositório. Não equivale a teste funcional em Windows, teste de carga, análise de segurança independente ou validação dos formatos CAD/BIM. A execução de CI consultada aprovou os testes Python e o build frontend, mas falhou no build nativo porque `icons/icon.ico` não existia. O `build.rs` foi corrigido para gerar o ícone; essa correção ainda aguarda uma nova confirmação de CI.
 
 ## 1. Parecer executivo
 
