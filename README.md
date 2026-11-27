@@ -90,7 +90,7 @@ A branch `feature/mvp-core-indexer` contém:
 - restauração de backup GED validado, criando uma cópia automática do banco atual antes da substituição;
 - indicadores de pastas, arquivos indexados e grupos de hashes duplicados;
 - Explorador conectado ao banco, com pesquisa por nome/caminho e conteúdo PDF já extraído, filtro de extensão, ordenação, paginação e propriedades;
-- extração textual de PDF individual ou em lote no desktop, com verificação SHA-256, limites de tamanho/páginas/caracteres e armazenamento FTS5 no mesmo SQLite;
+- extração textual de PDF individual ou em lote no desktop, com verificação SHA-256, limites de tamanho/páginas/caracteres, status de extração, trechos de contexto e armazenamento FTS5 no mesmo SQLite;
 - indicação de PDFs sem camada de texto, que exigirão OCR;
 - sugestões preliminares de número de desenho, revisão e título extraídas do PDF, exibidas na tela Revisão junto às evidências do nome e do carimbo;
 - migrações 6 e 7 para texto extraído, índice de conteúdo e contagem de páginas;
