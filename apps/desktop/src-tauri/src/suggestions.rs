@@ -148,7 +148,9 @@ pub fn list(connection: &Connection, status: &str, search: &str, limit: u32, off
     let pattern = format!("%{}%", search.replace('%', "\\%").replace('_', "\\_"));
     let total: u64 = connection.query_row(
         "SELECT COUNT(*) FROM filename_suggestions s JOIN files f ON f.id=s.file_id
-         WHERE (?1='all' OR s.status=?1) AND (?2='' OR f.filename LIKE ?3 ESCAPE '\\' OR f.relative_path LIKE ?3 ESCAPE '\\' OR COALESCE(s.drawing_number,'') LIKE ?3 ESCAPE '\\')",
+         WHERE (?1='all' OR s.status=?1) AND (?2='' OR f.filename LIKE ?3 ESCAPE '\\' OR f.relative_path LIKE ?3 ESCAPE '\\' OR COALESCE(s.drawing_number,'') LIKE ?3 ESCAPE '\\'
+           OR COALESCE((SELECT x.drawing_number FROM extracted_document_text x WHERE x.file_id=f.id AND x.sha256=f.sha256),'') LIKE ?3 ESCAPE '\\'
+           OR COALESCE((SELECT x.candidate_title FROM extracted_document_text x WHERE x.file_id=f.id AND x.sha256=f.sha256),'') LIKE ?3 ESCAPE '\\')",
         params![status, search, pattern], |row| row.get(0)
     ).map_err(|e| e.to_string())?;
     let mut statement = connection.prepare(
@@ -162,7 +164,9 @@ pub fn list(connection: &Connection, status: &str, search: &str, limit: u32, off
          COALESCE((SELECT x.metadata_confidence FROM extracted_document_text x WHERE x.file_id=f.id AND x.sha256=f.sha256),0),
          s.created_at
          FROM filename_suggestions s JOIN files f ON f.id=s.file_id
-         WHERE (?1='all' OR s.status=?1) AND (?2='' OR f.filename LIKE ?3 ESCAPE '\\' OR f.relative_path LIKE ?3 ESCAPE '\\' OR COALESCE(s.drawing_number,'') LIKE ?3 ESCAPE '\\')
+         WHERE (?1='all' OR s.status=?1) AND (?2='' OR f.filename LIKE ?3 ESCAPE '\\' OR f.relative_path LIKE ?3 ESCAPE '\\' OR COALESCE(s.drawing_number,'') LIKE ?3 ESCAPE '\\'
+           OR COALESCE((SELECT x.drawing_number FROM extracted_document_text x WHERE x.file_id=f.id AND x.sha256=f.sha256),'') LIKE ?3 ESCAPE '\\'
+           OR COALESCE((SELECT x.candidate_title FROM extracted_document_text x WHERE x.file_id=f.id AND x.sha256=f.sha256),'') LIKE ?3 ESCAPE '\\')
          ORDER BY CASE s.status WHEN 'pending' THEN 0 ELSE 1 END, s.confidence DESC, f.filename COLLATE NOCASE
          LIMIT ?4 OFFSET ?5"
     ).map_err(|e| e.to_string())?;
