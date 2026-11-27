@@ -159,7 +159,8 @@ pub fn list(connection: &Connection, status: &str, search: &str, limit: u32, off
     let rows = statement.query_map(params![status, search, pattern, limit.clamp(1,500), offset], |row| Ok(SuggestionRecord {
         id: row.get(0)?, file_id: row.get(1)?, filename: row.get(2)?, relative_path: row.get(3)?,
         project_prefix: row.get(4)?, discipline_code: row.get(5)?, drawing_number: row.get(6)?,
-        revision: row.get(7)?, confidence: row.get(8)?, status: row.get(9)?, applied: row.get(10)?,\n        titleblock_internal_number: row.get(11)?, titleblock_artesp_number: row.get(12)?, titleblock_title: row.get(13)?, created_at: row.get(14)?,
+        revision: row.get(7)?, confidence: row.get(8)?, status: row.get(9)?, applied: row.get(10)?,
+        titleblock_internal_number: row.get(11)?, titleblock_artesp_number: row.get(12)?, titleblock_title: row.get(13)?, created_at: row.get(14)?,
     })).map_err(|e| e.to_string())?;
     let mut items = Vec::new();
     for row in rows { items.push(row.map_err(|e| e.to_string())?); }
