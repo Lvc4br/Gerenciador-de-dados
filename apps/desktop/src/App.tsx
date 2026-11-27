@@ -118,6 +118,87 @@ function ExplorerPanel() {
   );
 }
 
+
+type DiscrepancyRecord = {
+  id: number; filename: string; branch: string; number_in_filename: string;
+  number_in_titleblock: string; revision: string; extracted_title: string;
+  title_for_titleblock_number: string; diagnosis: string; artesp_number: string;
+  internal_number: string; source_row: number; source_csv: string;
+};
+type DiscrepancyPage = { items: DiscrepancyRecord[]; total: number };
+
+function DiscrepanciesPanel() {
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const [data, setData] = useState<DiscrepancyPage>({ items: [], total: 0 });
+  const [selected, setSelected] = useState<DiscrepancyRecord | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const pageSize = 100;
+
+  async function loadDiscrepancies() {
+    setLoading(true); setError('');
+    try {
+      const result = await invoke<DiscrepancyPage>('list_discrepancies', {
+        search, limit: pageSize, offset: page * pageSize
+      });
+      setData(result);
+      setSelected(current => current && result.items.some(item => item.id === current.id)
+        ? current : (result.items[0] ?? null));
+    } catch (reason) { setError(String(reason)); }
+    finally { setLoading(false); }
+  }
+
+  useEffect(() => { void loadDiscrepancies(); }, [search, page]);
+  const totalPages = Math.max(1, Math.ceil(data.total / pageSize));
+
+  return (
+    <section className="explorer">
+      <div className="page-heading explorer-heading">
+        <div><div className="eyebrow">CONTROLE DE QUALIDADE</div><h1>Divergências identificadas</h1><p>Ocorrências importadas dos relatórios de análise, com os dados de origem preservados.</p></div>
+      </div>
+      <div className="explorer-toolbar">
+        <label className="explorer-search"><Search size={16} /><input value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Buscar arquivo, ramo, número ou diagnóstico..." /></label>
+      </div>
+      <div className="explorer-summary"><span>{loading ? 'Consultando ocorrências...' : data.total.toLocaleString('pt-BR') + ' divergência(s) registrada(s)'}</span><span>Os diagnósticos são preservados como vieram da fonte</span></div>
+      {error && <div className="notice error">{error}</div>}
+      <div className="explorer-layout discrepancy-layout">
+        <div className="file-table-wrap">
+          <table className="file-table discrepancy-table">
+            <thead><tr><th>Arquivo</th><th>Nº no nome</th><th>Nº no carimbo</th><th>Diagnóstico</th></tr></thead>
+            <tbody>
+              {data.items.map(item => <tr key={item.id} className={selected?.id === item.id ? 'selected' : ''} onClick={() => setSelected(item)}>
+                <td><div className="file-name"><CircleAlert size={16} /><div><b>{item.filename}</b><small>{item.branch}</small></div></div></td>
+                <td>{item.number_in_filename}</td>
+                <td>{item.number_in_titleblock}</td>
+                <td><span className={item.diagnosis.toLowerCase().startsWith('mesmo') ? 'finding-tag copy' : 'finding-tag mismatch'}>{item.diagnosis}</span></td>
+              </tr>)}
+              {!loading && data.items.length === 0 && <tr><td colSpan={4} className="table-empty">Nenhuma divergência importada. Importe uma pasta que contenha um CSV com o esquema de divergências reconhecido.</td></tr>}
+            </tbody>
+          </table>
+          <div className="pagination"><span>Página {page + 1} de {totalPages}</span><div><button disabled={page === 0} onClick={() => setPage(value => Math.max(0, value - 1))}><ChevronLeft size={15} /> Anterior</button><button disabled={page + 1 >= totalPages} onClick={() => setPage(value => Math.min(totalPages - 1, value + 1))}>Próxima <ChevronRight size={15} /></button></div></div>
+        </div>
+        <aside className="file-details">
+          <div className="details-heading"><CircleAlert size={18} /><b>Detalhes da ocorrência</b></div>
+          {selected ? <>
+            <h3>{selected.filename}</h3>
+            <div className="detail-row"><span>Ramo</span><b>{selected.branch}</b></div>
+            <div className="detail-row"><span>Número no nome</span><b>{selected.number_in_filename}</b></div>
+            <div className="detail-row"><span>Número no carimbo</span><b>{selected.number_in_titleblock}</b></div>
+            <div className="detail-row"><span>Revisão</span><b>{selected.revision || '—'}</b></div>
+            <div className="detail-row"><span>Título extraído</span><b>{selected.extracted_title}</b></div>
+            <div className="detail-row"><span>Título associado ao número do carimbo</span><b>{selected.title_for_titleblock_number}</b></div>
+            <div className="detail-row"><span>Diagnóstico da fonte</span><b>{selected.diagnosis}</b></div>
+            <div className="detail-row"><span>Desenho ARTESP</span><b>{selected.artesp_number}</b></div>
+            <div className="detail-row"><span>Desenho interno</span><b>{selected.internal_number}</b></div>
+            <p className="detail-note">Origem: {selected.source_csv}, linha {selected.source_row}. O GED exibe o diagnóstico importado; a confirmação da divergência exige revisão do responsável técnico.</p>
+          </> : <p className="detail-note">Selecione uma ocorrência para consultar os campos de origem.</p>}
+        </aside>
+      </div>
+    </section>
+  );
+}
+
 function App() {
   const [section, setSection] = useState<Section>("Visão geral");
   const [query, setQuery] = useState("");
@@ -185,7 +266,7 @@ function App() {
         </header>
 
         <div className="page-content">
-          {section === "Explorador" ? (<ExplorerPanel />) : section === "Visão geral" ? (
+          {section === "Explorador" ? (<ExplorerPanel />) : section === "Divergências" ? (<DiscrepanciesPanel />) : section === "Visão geral" ? (
             <>
               <div className="page-heading">
                 <div><div className="eyebrow">CENTRAL DE CONTROLE</div><h1>Visão geral</h1><p>Encontre, organize e analise o conhecimento dos projetos da sua engenharia.</p></div>
