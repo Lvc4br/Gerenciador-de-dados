@@ -45,6 +45,13 @@ fn open_database(app: &tauri::AppHandle) -> Result<Connection, String> {
            path TEXT NOT NULL UNIQUE,
            added_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
          );
+         CREATE TABLE IF NOT EXISTS scan_runs (
+           id INTEGER PRIMARY KEY AUTOINCREMENT,
+           root_id INTEGER NOT NULL REFERENCES scan_roots(id) ON DELETE CASCADE,
+           started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+           finished_at TEXT,
+           status TEXT NOT NULL DEFAULT 'running'
+         );
          CREATE TABLE IF NOT EXISTS files (
            id INTEGER PRIMARY KEY AUTOINCREMENT,
            root_id INTEGER NOT NULL REFERENCES scan_roots(id) ON DELETE CASCADE,
@@ -56,12 +63,23 @@ fn open_database(app: &tauri::AppHandle) -> Result<Connection, String> {
            sha256 TEXT NOT NULL,
            status TEXT NOT NULL DEFAULT 'indexed',
            indexed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+           last_seen_scan_id INTEGER REFERENCES scan_runs(id),
            UNIQUE(root_id, relative_path)
          );
          CREATE INDEX IF NOT EXISTS idx_files_sha256 ON files(sha256);
          CREATE INDEX IF NOT EXISTS idx_files_extension ON files(extension);
          CREATE INDEX IF NOT EXISTS idx_files_filename ON files(filename);"
     ).map_err(|e| e.to_string())?;
+    let has_last_seen: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('files') WHERE name='last_seen_scan_id'",
+        [], |row| row.get(0)
+    ).map_err(|e| e.to_string())?;
+    if has_last_seen == 0 {
+        connection.execute(
+            "ALTER TABLE files ADD COLUMN last_seen_scan_id INTEGER REFERENCES scan_runs(id)",
+            []
+        ).map_err(|e| e.to_string())?;
+    }
     csv_metadata::ensure_schema(&connection)?;
     Ok(connection)
 }
@@ -86,23 +104,41 @@ fn scan_folder(app: tauri::AppHandle, folder: String) -> Result<ScanSummary, Str
     connection.execute("INSERT OR IGNORE INTO scan_roots(path) VALUES (?1)", params![root.to_string_lossy()]).map_err(|e| e.to_string())?;
     let root_id: i64 = connection.query_row("SELECT id FROM scan_roots WHERE path=?1", params![root.to_string_lossy()], |row| row.get(0)).map_err(|e| e.to_string())?;
 
+    connection.execute(
+        "INSERT INTO scan_runs(root_id,status) VALUES (?1,'running')",
+        params![root_id]
+    ).map_err(|e| e.to_string())?;
+    let scan_id = connection.last_insert_rowid();
+
     let transaction = connection.transaction().map_err(|e| e.to_string())?;
     let mut indexed = 0u64;
     let mut skipped = 0u64;
     let mut errors = 0u64;
+    let mut traversal_errors = 0u64;
 
-    for entry in WalkDir::new(&root).follow_links(false).into_iter().filter_map(Result::ok) {
+    for entry_result in WalkDir::new(&root).follow_links(false) {
+        let entry = match entry_result {
+            Ok(value) => value,
+            Err(_) => { errors += 1; traversal_errors += 1; continue; }
+        };
         if !entry.file_type().is_file() { continue; }
         let path = entry.path();
         let metadata = match path.metadata() {
             Ok(value) => value,
             Err(_) => { errors += 1; continue; }
         };
-        if metadata.len() > MAX_FILE_SIZE { skipped += 1; continue; }
         let relative = match path.strip_prefix(&root) {
             Ok(value) => value.to_string_lossy().replace('\\', "/"),
             Err(_) => { errors += 1; continue; }
         };
+        if metadata.len() > MAX_FILE_SIZE {
+            skipped += 1;
+            let _ = transaction.execute(
+                "UPDATE files SET last_seen_scan_id=?1,status='skipped' WHERE root_id=?2 AND relative_path=?3",
+                params![scan_id, root_id, relative]
+            );
+            continue;
+        }
         let hash = match hash_file(path) {
             Ok(value) => value,
             Err(_) => { errors += 1; continue; }
@@ -115,13 +151,14 @@ fn scan_folder(app: tauri::AppHandle, folder: String) -> Result<ScanSummary, Str
             .unwrap_or_default();
 
         if transaction.execute(
-            "INSERT INTO files(root_id,relative_path,filename,extension,byte_size,modified_at,sha256,status)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,'indexed')
+            "INSERT INTO files(root_id,relative_path,filename,extension,byte_size,modified_at,sha256,status,last_seen_scan_id)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,'indexed',?8)
              ON CONFLICT(root_id,relative_path) DO UPDATE SET
              filename=excluded.filename, extension=excluded.extension,
              byte_size=excluded.byte_size, modified_at=excluded.modified_at,
-             sha256=excluded.sha256, status='indexed', indexed_at=CURRENT_TIMESTAMP",
-            params![root_id, relative, filename, extension, metadata.len() as i64, modified, hash]
+             sha256=excluded.sha256, status='indexed', indexed_at=CURRENT_TIMESTAMP,
+             last_seen_scan_id=excluded.last_seen_scan_id",
+            params![root_id, relative, filename, extension, metadata.len() as i64, modified, hash, scan_id]
         ).is_ok() {
             indexed += 1;
             if extension == "csv" {
@@ -140,7 +177,17 @@ fn scan_folder(app: tauri::AppHandle, folder: String) -> Result<ScanSummary, Str
             }
         } else { errors += 1; }
     }
+    if traversal_errors == 0 {
+        transaction.execute(
+            "UPDATE files SET status='missing' WHERE root_id=?1 AND (last_seen_scan_id IS NULL OR last_seen_scan_id != ?2)",
+            params![root_id, scan_id]
+        ).map_err(|e| e.to_string())?;
+    }
     transaction.commit().map_err(|e| e.to_string())?;
+    connection.execute(
+        "UPDATE scan_runs SET finished_at=CURRENT_TIMESTAMP,status=?1 WHERE id=?2",
+        params![if traversal_errors == 0 { "completed" } else { "partial" }, scan_id]
+    ).map_err(|e| e.to_string())?;
 
     let duplicate_hash_groups: u64 = connection.query_row(
         "SELECT COUNT(*) FROM (SELECT sha256 FROM files GROUP BY sha256 HAVING COUNT(*) > 1)",
