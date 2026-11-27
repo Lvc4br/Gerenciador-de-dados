@@ -5,12 +5,12 @@ from pathlib import Path
 
 # Conservative filename-only heuristics. Results are suggestions, never assignments.
 _DRAWING_NUMBER = re.compile(
-    r"(?:^|[-_.])(?P<discipline>[A-Z]{2,5})[-_]?(?P<number>\\d{2,5})(?=$|[-_.])"
+    r"(?:^|[-_.])(?P<discipline>[A-Z]{2,5})[-_]?(?P<number>\d{2,5})(?=$|[-_.])"
 )
 _REVISION = re.compile(
-    r"(?:^|[-_.])(?:REV(?:ISION|ISAO)?[-_ .]?|R[-_ .]?)(?P<revision>\\d{1,3}|[A-Z])(?=$|[-_.])"
+    r"(?:^|[-_.])(?:REV(?:ISION|ISAO)?[-_ .]?|R[-_ .]?)(?P<revision>\d{1,3}|[A-Z])(?=$|[-_.])"
 )
-_PROJECT_PREFIX = re.compile(r"^(?P<prefix>[A-Z]{1,6}\\d{1,4}[A-Z]?)\b")
+_PROJECT_PREFIX = re.compile(r"^(?P<prefix>[A-Z]{1,6}\d{1,4}[A-Z]?)\b")
 
 
 def extract_filename_metadata(filename: str | Path) -> dict[str, str | float | None]:
