@@ -3,12 +3,19 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 
 from .database import connect
 from .scanner import scan_folder, sha256_file
 from .pdf import extract_pdf_text, PdfExtractionError
 from .naming import extract_filename_metadata
+
+def build_content_fts_query(query: str) -> str:
+    terms = [term for term in re.findall(r"[^\\W_]+", query, flags=re.UNICODE) if len(term) >= 2]
+    if not terms:
+        raise ValueError("Informe ao menos um termo com dois ou mais caracteres.")
+    return " AND ".join(f'"{term.replace(chr(34), chr(34) * 2)}"*' for term in terms)
 
 def default_database_path() -> Path:
     base = Path(os.environ.get("LOCALAPPDATA", Path.home() / ".local" / "share"))
@@ -112,6 +119,10 @@ def main() -> None:
     elif args.command == "search-content":
         if args.limit < 1 or args.limit > 500:
             parser.error("--limit deve ficar entre 1 e 500")
+        try:
+            fts_query = build_content_fts_query(args.query)
+        except ValueError as exc:
+            parser.error(str(exc))
         with connect(args.database) as connection:
             rows = connection.execute(
                 """SELECT f.id AS file_id,f.filename,f.relative_path,r.path,
@@ -121,7 +132,7 @@ def main() -> None:
                    JOIN scan_roots r ON r.id=f.root_id
                    WHERE document_text_fts MATCH ?
                    ORDER BY rank LIMIT ?""",
-                (args.query,args.limit),
+                (fts_query,args.limit),
             ).fetchall()
         print(json.dumps({"ok": True, "count": len(rows), "results": [
             {"file_id": row["file_id"], "filename": row["filename"],
