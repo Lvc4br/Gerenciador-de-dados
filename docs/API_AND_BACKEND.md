@@ -106,3 +106,12 @@ Comandos Tauri:
 A tabela `filename_suggestions` possui chave única por arquivo e versão do parser. Reindexar com os mesmos valores preserva a decisão humana; quando os valores extraídos mudam, a situação volta para `pending`. A análise usa somente o nome do arquivo e nunca abre ou altera o original.
 
 A aceitação atual registra a decisão, mas não promove os campos para os metadados oficiais nem cria associação automática a projeto. Essa promoção exige uma etapa própria de comparação com carimbo/cadastro e trilha de auditoria.
+
+
+### Aplicação de metadados aceitos e auditoria
+
+- `apply_accepted_filename_suggestion(id)`: permite promover uma sugestão já aceita para `confirmed_document_metadata`.
+- A promoção ocorre em transação SQLite e mantém a origem em `source_suggestion_id`.
+- `metadata_audit_log` registra criação/atualização, valores anteriores e novos em JSON, identificador local do ator e data/hora.
+- O botão de aplicação é separado da aceitação. Assim, o engenheiro pode aceitar primeiro e aplicar em outro momento.
+- A aplicação não cria vínculo de projeto, não altera o arquivo original e não substitui os dados importados dos CSVs.
