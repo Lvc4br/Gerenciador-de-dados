@@ -140,6 +140,7 @@ fn open_database(app: &tauri::AppHandle) -> Result<Connection, String> {
 
     apply_fts_migration(&connection)?;
     apply_document_text_migration(&connection)?;
+    apply_pdf_page_count_migration(&connection)?;
     csv_metadata::ensure_schema(&connection)?;
     projects::ensure_schema(&connection)?;
     projects::ensure_relations_schema(&connection)?;
@@ -220,6 +221,24 @@ fn apply_document_text_migration(connection: &Connection) -> Result<(), String> 
     ).map_err(|e| format!("Não foi possível preparar o índice de conteúdo PDF: {e}"))?;
     transaction.execute(
         "INSERT INTO schema_migrations(version, name) VALUES (6, 'pdf_document_text_search')",
+        []
+    ).map_err(|e| e.to_string())?;
+    transaction.commit().map_err(|e| e.to_string())
+}
+
+fn apply_pdf_page_count_migration(connection: &Connection) -> Result<(), String> {
+    let already_applied: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM schema_migrations WHERE version=7",
+        [], |row| row.get(0)
+    ).map_err(|e| e.to_string())?;
+    if already_applied > 0 { return Ok(()); }
+    let transaction = connection.unchecked_transaction().map_err(|e| e.to_string())?;
+    transaction.execute_batch(
+        "ALTER TABLE extracted_document_text ADD COLUMN page_count INTEGER NOT NULL DEFAULT 0;
+         ALTER TABLE extracted_document_text ADD COLUMN pages_with_text INTEGER NOT NULL DEFAULT 0;"
+    ).map_err(|e| format!("Não foi possível ampliar os metadados de extração PDF: {e}"))?;
+    transaction.execute(
+        "INSERT INTO schema_migrations(version, name) VALUES (7, 'pdf_extracted_page_counts')",
         []
     ).map_err(|e| e.to_string())?;
     transaction.commit().map_err(|e| e.to_string())
@@ -682,25 +701,41 @@ fn extract_pdf_text_blocking(app: tauri::AppHandle, file_id: i64) -> Result<serd
         return Err("O PDF foi alterado desde a última varredura. Execute uma nova indexação antes de extrair.".into());
     }
     let path_string = file_path.to_string_lossy().to_string();
-    let extracted = pdf_extract::extract_text(&path_string)
+    let pages = pdf_extract::extract_text_by_pages(&path_string)
         .map_err(|e| format!("Não foi possível extrair o texto do PDF: {e}"))?;
-    let normalized = extracted.replace("\r\n", "\n").replace('\r', "\n");
-    let character_count = normalized.chars().count();
-    if character_count > MAX_PDF_TEXT_CHARACTERS {
-        return Err(format!("Texto extraído excede o limite de {MAX_PDF_TEXT_CHARACTERS} caracteres."));
+    if pages.len() > 5000 {
+        return Err("PDF excede o limite de 5.000 páginas para extração.".into());
+    }
+    let page_count = pages.len();
+    let mut pages_with_text = 0usize;
+    let mut character_count = 0usize;
+    let mut content = String::new();
+    for (index, page_text) in pages.iter().enumerate() {
+        let page_text = page_text.replace("\r\n", "\n").replace('\r', "\n");
+        if !page_text.trim().is_empty() {
+            pages_with_text += 1;
+            character_count += page_text.chars().count();
+            if character_count > MAX_PDF_TEXT_CHARACTERS {
+                return Err(format!("Texto extraído excede o limite de {MAX_PDF_TEXT_CHARACTERS} caracteres."));
+            }
+            content.push_str(&format!("\n\n--- Página {} ---\n{}", index + 1, page_text));
+        }
     }
     connection.execute(
-        "INSERT INTO extracted_document_text(file_id,sha256,content,character_count,parser_version)
-         VALUES (?1,?2,?3,?4,'pdf-extract-0.12.1')
+        "INSERT INTO extracted_document_text(file_id,sha256,content,character_count,parser_version,page_count,pages_with_text)
+         VALUES (?1,?2,?3,?4,'pdf-extract-0.12.1',?5,?6)
          ON CONFLICT(file_id) DO UPDATE SET sha256=excluded.sha256,
            content=excluded.content, character_count=excluded.character_count,
-           parser_version=excluded.parser_version, extracted_at=CURRENT_TIMESTAMP",
-        params![file_id, expected_hash, normalized, character_count as i64]
+           parser_version=excluded.parser_version, page_count=excluded.page_count,
+           pages_with_text=excluded.pages_with_text, extracted_at=CURRENT_TIMESTAMP",
+        params![file_id, expected_hash, content, character_count as i64, page_count as i64, pages_with_text as i64]
     ).map_err(|e| format!("Não foi possível salvar o texto extraído: {e}"))?;
     Ok(serde_json::json!({
         "file_id": file_id,
         "character_count": character_count,
-        "needs_ocr": normalized.trim().is_empty(),
+        "page_count": page_count,
+        "pages_with_text": pages_with_text,
+        "needs_ocr": pages_with_text == 0,
         "parser_version": "pdf-extract-0.12.1"
     }))
 }
