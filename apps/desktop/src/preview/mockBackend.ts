@@ -14,12 +14,12 @@ type MockFilenameSuggestion = {
   id: number; file_id: number; filename: string; relative_path: string;
   project_prefix: string | null; discipline_code: string | null;
   drawing_number: string | null; revision: string | null;
-  confidence: number; status: "pending" | "accepted" | "rejected"; created_at: string;
+  confidence: number; status: "pending" | "accepted" | "rejected"; applied: boolean; created_at: string;
 };
 let sampleFilenameSuggestions: MockFilenameSuggestion[] = [
-  { id: 1, file_id: 1, filename: "AB20A-EST-001.dwg", relative_path: "Estruturas/AB20A-EST-001.dwg", project_prefix: "AB20A", discipline_code: "EST", drawing_number: "EST-001", revision: "02", confidence: 0.92, status: "pending" as const, created_at: "2026-11-27" },
+  { id: 1, file_id: 1, filename: "AB20A-EST-001.dwg", relative_path: "Estruturas/AB20A-EST-001.dwg", project_prefix: "AB20A", discipline_code: "EST", drawing_number: "EST-001", revision: "02", confidence: 0.92, status: "pending" as const, applied: false, created_at: "2026-11-27" },
   { id: 2, file_id: 2, filename: "AB20A-EST-001.pdf", relative_path: "Estruturas/AB20A-EST-001.pdf", project_prefix: "AB20A", discipline_code: "EST", drawing_number: "EST-001", revision: null, confidence: 0.78, status: "pending" as const, created_at: "2026-11-27" },
-  { id: 3, file_id: 5, filename: "AB20A-DRE-014.dwg", relative_path: "Drenagem/AB20A-DRE-014.dwg", project_prefix: "AB20A", discipline_code: "DRE", drawing_number: "DRE-014", revision: null, confidence: 0.78, status: "accepted" as const, created_at: "2026-11-27" }
+  { id: 3, file_id: 5, filename: "AB20A-DRE-014.dwg", relative_path: "Drenagem/AB20A-DRE-014.dwg", project_prefix: "AB20A", discipline_code: "DRE", drawing_number: "DRE-014", revision: null, confidence: 0.78, status: "accepted" as const, applied: false, created_at: "2026-11-27" }
 ];
 let sampleProjects = [
   { id: 1, code: 'AB20A', name: 'Adequação da Ponte AB20A', client: 'ARTESP', description: 'Projeto demonstrativo de engenharia', status: 'active', root_count: 1, file_count: 6, created_at: '2026-11-01', updated_at: '2026-11-20' }
