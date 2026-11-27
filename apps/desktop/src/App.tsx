@@ -522,7 +522,8 @@ type FilenameSuggestion = {
   id: number; file_id: number; filename: string; relative_path: string;
   project_prefix: string | null; discipline_code: string | null;
   drawing_number: string | null; revision: string | null;
-  confidence: number; status: "pending" | "accepted" | "rejected"; applied: boolean; titleblock_internal_number: string | null; titleblock_artesp_number: string | null; titleblock_title: string | null; created_at: string;
+  confidence: number; status: "pending" | "accepted" | "rejected"; applied: boolean; titleblock_internal_number: string | null; titleblock_artesp_number: string | null; titleblock_title: string | null;
+  pdf_drawing_number: string | null; pdf_revision: string | null; pdf_title: string | null; pdf_confidence: number; created_at: string;
 };
 type SuggestionPage = { items: FilenameSuggestion[]; total: number };
 
@@ -588,6 +589,16 @@ function ReviewPanel() {
               <div><small>Nº ARTESP no carimbo</small><b>{item.titleblock_artesp_number || "Não importado"}</b></div>
               <div><small>Título importado</small><b>{item.titleblock_title || "Não importado"}</b></div>
             </div>
+            {item.filename.toLowerCase().endsWith(".pdf") && <div className="review-metadata titleblock-comparison">
+              <div><small>Número sugerido pelo PDF</small><b>{item.pdf_drawing_number || "Ainda não extraído"}</b></div>
+              <div><small>Revisão sugerida pelo PDF</small><b>{item.pdf_revision || "—"}</b></div>
+              <div><small>Título sugerido pelo PDF</small><b>{item.pdf_title || "—"}</b></div>
+              <div><small>Confiança do parser PDF</small><b>{Math.round(item.pdf_confidence * 100)}%</b></div>
+              {item.pdf_drawing_number && item.drawing_number &&
+                item.pdf_drawing_number.toUpperCase() !== item.drawing_number.toUpperCase() &&
+                <div className="metadata-warning">O número sugerido pelo PDF difere do número identificado no nome. Confira as evidências antes de confirmar.</div>}
+              {!item.pdf_drawing_number && <div className="metadata-hint">Para analisar o conteúdo, extraia o texto deste PDF no Explorador.</div>}
+            </div>}
             {item.status === "pending" && <div className="dashboard-actions review-actions">
               <button className="secondary-button" disabled={busyId === item.id} onClick={() => void review(item, "rejected")}>Rejeitar</button>
               <button className="primary-button" disabled={busyId === item.id} onClick={() => void review(item, "accepted")}>{busyId === item.id ? "Salvando..." : "Aceitar sugestão"}</button>
