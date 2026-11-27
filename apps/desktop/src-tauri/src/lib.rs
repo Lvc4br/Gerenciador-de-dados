@@ -91,6 +91,15 @@ fn open_database(app: &tauri::AppHandle) -> Result<Connection, String> {
          );
          CREATE INDEX IF NOT EXISTS idx_file_versions_file ON file_versions(file_id, captured_at DESC);"
     ).map_err(|e| e.to_string())?;
+    // Versioned migrations make future schema changes explicit and repeatable.
+    connection.execute_batch(
+        "CREATE TABLE IF NOT EXISTS schema_migrations (
+           version INTEGER PRIMARY KEY,
+           name TEXT NOT NULL,
+           applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+         );"
+    ).map_err(|e| e.to_string())?;
+
     let has_last_seen: i64 = connection.query_row(
         "SELECT COUNT(*) FROM pragma_table_info('files') WHERE name='last_seen_scan_id'",
         [], |row| row.get(0)
@@ -101,6 +110,32 @@ fn open_database(app: &tauri::AppHandle) -> Result<Connection, String> {
             []
         ).map_err(|e| e.to_string())?;
     }
+
+    // Migration 1 establishes the baseline for databases created by earlier MVP builds.
+    connection.execute(
+        "INSERT OR IGNORE INTO schema_migrations(version, name) VALUES (1, 'baseline_scan_and_file_history')",
+        []
+    ).map_err(|e| e.to_string())?;
+
+    let migration_2: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM schema_migrations WHERE version=2",
+        [], |row| row.get(0)
+    ).map_err(|e| e.to_string())?;
+    if migration_2 == 0 {
+        let transaction = connection.unchecked_transaction().map_err(|e| e.to_string())?;
+        transaction.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_files_root_status_path
+               ON files(root_id, status, relative_path);
+             CREATE INDEX IF NOT EXISTS idx_file_versions_hash
+               ON file_versions(sha256);"
+        ).map_err(|e| e.to_string())?;
+        transaction.execute(
+            "INSERT INTO schema_migrations(version, name) VALUES (2, 'catalog_lookup_indexes')",
+            []
+        ).map_err(|e| e.to_string())?;
+        transaction.commit().map_err(|e| e.to_string())?;
+    }
+
     csv_metadata::ensure_schema(&connection)?;
     Ok(connection)
 }
@@ -309,6 +344,12 @@ fn create_database_backup(app: tauri::AppHandle, destination_path: String) -> Re
     if integrity != "ok" {
         return Err(format!("O backup foi criado, mas a verificação falhou: {integrity}"));
     }
+    let foreign_key_errors: i64 = destination.query_row(
+        "SELECT COUNT(*) FROM pragma_foreign_key_check", [], |row| row.get(0)
+    ).map_err(|e| e.to_string())?;
+    if foreign_key_errors > 0 {
+        return Err(format!("O backup contém {foreign_key_errors} relação(ões) quebrada(s)."));
+    }
     Ok(destination_path.to_string_lossy().to_string())
 }
 
@@ -326,7 +367,7 @@ fn restore_database_backup(app: tauri::AppHandle, source_path: String) -> Result
     let backup_dir = app.path().app_data_dir().map_err(|e| e.to_string())?.join("backups");
     std::fs::create_dir_all(&backup_dir).map_err(|e| e.to_string())?;
     let stamp = SystemTime::now().duration_since(UNIX_EPOCH)
-        .map_err(|e| e.to_string())?.as_secs();
+        .map_err(|e| e.to_string())?.as_millis();
     let safety_path = backup_dir.join(format!("ged-pre-restore-{stamp}.sqlite3"));
     let current = open_database(&app)?;
     let mut safety_copy = Connection::open(&safety_path).map_err(|e| e.to_string())?;
