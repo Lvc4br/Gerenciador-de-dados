@@ -130,3 +130,15 @@ Esta entrega amplia o backend, mas ainda não significa que os novos recursos es
 O Explorador agora oferece um seletor de projetos ativos e a ação **Vincular documento** para associar o arquivo selecionado a um projeto, mesmo sem vincular sua pasta inteira. O relacionamento é lógico, usa a chave composta projeto/documento e permite que o mesmo documento seja associado a diferentes projetos. O vínculo não copia, move ou altera o arquivo original.
 
 A prévia visual simula essa operação em memória. No aplicativo Tauri, o comando usa SQLite. A confirmação final depende da conclusão do CI e de teste funcional no Windows. A remoção de um vínculo individual e a seleção em lote ainda são melhorias futuras.
+
+
+### Pesquisa global por cliente, projeto e disciplina (27/11/2026)
+
+O Explorador recebeu filtros combináveis por cliente, projeto e disciplina, mantendo pesquisa textual, extensão, ordenação e paginação. O backend SQLite aplica os filtros diretamente na consulta, usando vínculos de pastas e vínculos individuais de documentos; a prévia de navegador simula os mesmos critérios.
+
+- Cliente: localiza documentos associados a projetos cujo cadastro contém o cliente informado.
+- Projeto: restringe o resultado aos arquivos encontrados nas raízes vinculadas ou associados individualmente ao projeto.
+- Disciplina: restringe a documentos com vínculo explícito à disciplina selecionada.
+- Os filtros podem ser combinados com nome/caminho e extensão.
+
+Limitação: o filtro de disciplina exige associação explícita do documento à disciplina. A classificação automática por regras e a extração de metadados ainda não fazem parte desta entrega. A compilação e os testes desta alteração precisam ser confirmados pelo CI antes da validação no executável Windows.
