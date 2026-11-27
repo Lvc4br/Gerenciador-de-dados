@@ -124,3 +124,9 @@ Foi adicionada a migração SQLite versão 5, sem alterar arquivos originais:
 
 Esta entrega amplia o backend, mas ainda não significa que os novos recursos estejam expostos na interface. A tela de projetos precisa receber a próxima integração visual; a prévia de navegador também precisa de mocks correspondentes. Testes automatizados e CI devem validar a migração em bancos novos e existentes antes de uso com dados importantes.
 \n\n### Interface de disciplinas e documentos (27/11/2026)\n\nA tela Projetos foi conectada aos novos comandos: edição de projeto, listagem e manutenção de disciplinas, consulta dos documentos das pastas vinculadas e atribuição de disciplina por documento. A prévia recebeu mocks para esses fluxos. O comportamento real depende do runtime Tauri/SQLite e ainda precisa de validação funcional no Windows.\n
+
+### Associação de documentos individuais pelo Explorador (27/11/2026)
+
+O Explorador agora oferece um seletor de projetos ativos e a ação **Vincular documento** para associar o arquivo selecionado a um projeto, mesmo sem vincular sua pasta inteira. O relacionamento é lógico, usa a chave composta projeto/documento e permite que o mesmo documento seja associado a diferentes projetos. O vínculo não copia, move ou altera o arquivo original.
+
+A prévia visual simula essa operação em memória. No aplicativo Tauri, o comando usa SQLite. A confirmação final depende da conclusão do CI e de teste funcional no Windows. A remoção de um vínculo individual e a seleção em lote ainda são melhorias futuras.
