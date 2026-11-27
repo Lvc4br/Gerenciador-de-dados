@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { isPreviewMode, previewInvoke } from "./preview/mockBackend";
 import { listen } from "@tauri-apps/api/event";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import {
@@ -31,6 +32,11 @@ type FileRecord = {
 };
 type FilePage = { items: FileRecord[]; total: number };
 type FileVersion = { id: number; sha256: string; byte_size: number; modified_at: string; captured_at: string };
+
+async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+  if (isPreviewMode) return previewInvoke<T>(command, args);
+  return tauriInvoke<T>(command, args);
+}
 
 function formatDate(value: string, includeTime = false) {
   if (!value) return '—';
@@ -243,6 +249,10 @@ function App() {
 
   async function createBackup() {
     setError("");
+    if (isPreviewMode) {
+      setMessage("Prévia visual: o backup real só funciona no aplicativo desktop conectado ao SQLite.");
+      return;
+    }
     const destination = await save({
       title: "Salvar backup do GED",
       defaultPath: "ged-backup.sqlite3",
@@ -260,6 +270,10 @@ function App() {
 
   async function restoreBackup() {
     setError("");
+    if (isPreviewMode) {
+      setMessage("Prévia visual: a restauração real só funciona no aplicativo desktop conectado ao SQLite.");
+      return;
+    }
     const selected = await open({
       title: "Selecionar backup para restauração",
       directory: false,
@@ -280,6 +294,10 @@ function App() {
 
   async function importFolder() {
     setError("");
+    if (isPreviewMode) {
+      setMessage("Prévia visual: para indexar uma pasta real, execute o GED em modo desktop com npm run tauri dev.");
+      return;
+    }
     const selected = await open({ directory: true, multiple: false, title: "Selecionar pasta de projetos" });
     if (typeof selected !== "string") return;
     setScanning(true);
@@ -336,6 +354,7 @@ function App() {
         </header>
 
         <div className="page-content">
+          {isPreviewMode && <div className="preview-banner"><b>PRÉVIA VISUAL</b><span>Dados demonstrativos. Indexação, backup e restauração reais exigem o aplicativo desktop.</span></div>}
           {section === "Explorador" ? (<ExplorerPanel />) : section === "Divergências" ? (<DiscrepanciesPanel />) : section === "Visão geral" ? (
             <>
               <div className="page-heading">
@@ -378,7 +397,7 @@ function App() {
             <div className="empty-state"><div className="empty-icon"><SlidersHorizontal size={25} /></div><div className="eyebrow">MÓDULO EM CONSTRUÇÃO</div><h2>{section}</h2><p>Esta área será conectada ao banco local e aos serviços de indexação nas próximas entregas.</p><button className="secondary-button" onClick={() => setSection("Visão geral")}>Voltar à visão geral</button></div>
           )}
         </div>
-        <footer className="statusbar"><span><span className="status-led" /> Aplicativo local</span><span>Windows 10+ · 64 bits</span><span>Os arquivos originais não são modificados</span></footer>
+        <footer className="statusbar"><span><span className="status-led" /> {isPreviewMode ? "Prévia visual" : "Aplicativo local"}</span><span>Windows 10+ · 64 bits</span><span>{isPreviewMode ? "Dados demonstrativos" : "Os arquivos originais não são modificados"}</span></footer>
       </main>
     </div>
   );
