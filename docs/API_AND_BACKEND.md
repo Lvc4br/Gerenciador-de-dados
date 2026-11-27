@@ -127,6 +127,7 @@ Limites de proteção: 200 MB por arquivo, 5.000 páginas e 10 milhões de carac
 
 Comandos:
 - `ged-indexer extract-pdf <file_id>`: localiza um PDF previamente catalogado, confere o SHA-256 atual contra a última varredura, extrai e salva o texto em `extracted_document_text`.
+- `ged-indexer extract-pdfs --limit 100`: processa em lote até 100 PDFs pendentes ou alterados; o limite permitido é de 1 a 500 por execução. Falhas individuais são reportadas sem interromper os demais arquivos.
 - `ged-indexer search-content "<termos>" --limit 50`: pesquisa o texto indexado pelo FTS5 e devolve caminho e trecho de contexto.
 
 A tabela `document_text_fts` é mantida por triggers quando o conteúdo extraído é inserido, atualizado ou removido. O texto é separado dos arquivos originais. Este fluxo ainda pertence ao banco do motor Python; a integração com o banco SQLite Rust/Tauri e com a busca na interface desktop é trabalho pendente, não devendo ser confundida com uma função já disponível no executável.
