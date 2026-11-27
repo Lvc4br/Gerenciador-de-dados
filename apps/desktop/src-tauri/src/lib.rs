@@ -1,3 +1,5 @@
+mod csv_metadata;
+
 use rusqlite::{params, Connection};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -58,6 +60,7 @@ fn open_database(app: &tauri::AppHandle) -> Result<Connection, String> {
          CREATE INDEX IF NOT EXISTS idx_files_extension ON files(extension);
          CREATE INDEX IF NOT EXISTS idx_files_filename ON files(filename);"
     ).map_err(|e| e.to_string())?;
+    csv_metadata::ensure_schema(&connection)?;
     Ok(connection)
 }
 
@@ -117,7 +120,23 @@ fn scan_folder(app: tauri::AppHandle, folder: String) -> Result<ScanSummary, Str
              byte_size=excluded.byte_size, modified_at=excluded.modified_at,
              sha256=excluded.sha256, status='indexed', indexed_at=CURRENT_TIMESTAMP",
             params![root_id, relative, filename, extension, metadata.len() as i64, modified, hash]
-        ).is_ok() { indexed += 1; } else { errors += 1; }
+        ).is_ok() {
+            indexed += 1;
+            if extension == "csv" {
+                match transaction.query_row(
+                    "SELECT id FROM files WHERE root_id=?1 AND relative_path=?2",
+                    params![root_id, relative],
+                    |row| row.get::<_, i64>(0)
+                ) {
+                    Ok(file_id) => {
+                        if csv_metadata::import_metadata_csv(&transaction, file_id, path).is_err() {
+                            errors += 1;
+                        }
+                    }
+                    Err(_) => errors += 1,
+                }
+            }
+        } else { errors += 1; }
     }
     transaction.commit().map_err(|e| e.to_string())?;
 
