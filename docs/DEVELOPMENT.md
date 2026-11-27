@@ -12,9 +12,27 @@ Windows 10 ou superior, 64 bits. O build de distribuição deve ser executado e 
 - WebView2 Runtime (normalmente já presente em versões atuais do Windows).
 - Python 3.10+ apenas para desenvolver e testar os parsers do serviço Python.
 
-## Executar a interface desktop em desenvolvimento
+## Abrir uma prévia visual no VS Code (sem Rust)
 
-No terminal, entre em `apps/desktop`:
+Esta opção permite conhecer a interface antes de compilar o aplicativo desktop. Ela usa dados demonstrativos e não acessa pastas, SQLite, backups ou o indexador real.
+
+1. Abra a pasta raiz do repositório no VS Code.
+2. Abra **Terminal → Novo Terminal**.
+3. Execute:
+
+```powershell
+cd apps/desktop
+npm install
+npm run preview
+```
+
+4. Abra no navegador o endereço indicado pelo Vite (por padrão, `http://localhost:1420`).
+
+Na prévia, é possível navegar pela Visão geral, Explorador e Divergências, testar pesquisa, filtros, ordenação e paginação. Os botões de importação, backup e restauração explicam que essas operações exigem o aplicativo desktop. Os dados exibidos são fictícios e não devem ser usados como registros de engenharia.
+
+## Executar o aplicativo desktop real em desenvolvimento
+
+Para testar o backend Rust, SQLite, diálogos nativos e indexação de pastas, instale também Rust stable/MSVC, C++ Build Tools e WebView2 Runtime. No terminal, entre em `apps/desktop`:
 
 ```powershell
 npm install
