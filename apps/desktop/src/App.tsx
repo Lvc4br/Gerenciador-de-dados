@@ -25,7 +25,7 @@ const emptyStats: DashboardStats = { root_count: 0, file_count: 0, duplicate_has
 
 type FileRecord = {
   id: number; filename: string; relative_path: string; extension: string;
-  byte_size: number; modified_at: string; sha256: string; root_path: string;
+  byte_size: number; modified_at: string; sha256: string; root_path: string; status: string;
 };
 type FilePage = { items: FileRecord[]; total: number };
 
@@ -88,15 +88,16 @@ function ExplorerPanel() {
       <div className="explorer-layout">
         <div className="file-table-wrap">
           <table className="file-table">
-            <thead><tr><th>Nome</th><th>Tipo</th><th>Tamanho</th><th>Última modificação</th></tr></thead>
+            <thead><tr><th>Nome</th><th>Tipo</th><th>Tamanho</th><th>Última modificação</th><th>Status</th></tr></thead>
             <tbody>
               {data.items.map(file => <tr key={file.id} className={selected?.id === file.id ? 'selected' : ''} onClick={() => setSelected(file)}>
                 <td><div className="file-name"><FileText size={16} /><div><b>{file.filename}</b><small>{file.relative_path}</small></div></div></td>
                 <td><span className="file-ext">{file.extension ? file.extension.toUpperCase() : 'SEM TIPO'}</span></td>
                 <td>{formatBytes(file.byte_size)}</td>
                 <td>{formatDate(file.modified_at)}</td>
+                <td><span className={`file-status ${file.status}`}>{file.status === 'missing' ? 'Ausente' : file.status === 'skipped' ? 'Ignorado' : 'Indexado'}</span></td>
               </tr>)}
-              {!loading && data.items.length === 0 && <tr><td colSpan={4} className="table-empty">Nenhum arquivo encontrado. Importe uma pasta na Visão geral para começar.</td></tr>}
+              {!loading && data.items.length === 0 && <tr><td colSpan={5} className="table-empty">Nenhum arquivo encontrado. Importe uma pasta na Visão geral para começar.</td></tr>}
             </tbody>
           </table>
           <div className="pagination"><span>Página {page + 1} de {totalPages}</span><div><button disabled={page === 0} onClick={() => setPage(value => Math.max(0, value - 1))}><ChevronLeft size={15} /> Anterior</button><button disabled={page + 1 >= totalPages} onClick={() => setPage(value => Math.min(totalPages - 1, value + 1))}>Próxima <ChevronRight size={15} /></button></div></div>
