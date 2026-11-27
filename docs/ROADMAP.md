@@ -45,8 +45,10 @@
 - O parser Python oferece diagnóstico via CLI; o desktop possui parser conservador equivalente em Rust para que a funcionalidade opere diretamente no SQLite usado pelo aplicativo.
 - Durante a varredura desktop, sugestões com correspondência são persistidas em `filename_suggestions`, separadas dos vínculos de projeto e dos metadados importados do carimbo.
 - A tela **Revisão** lista sugestões por situação, permite pesquisa e registra decisões `accepted` ou `rejected`.
+- A tela exibe também os números e o título importados do carimbo quando encontra correspondência pelo nome do arquivo.
 - Uma nova varredura com o mesmo resultado preserva a decisão humana; se os metadados identificados mudarem, a sugestão retorna para `pending`.
-- A revisão registra a decisão, mas ainda não promove os valores para os metadados oficiais nem cria vínculo automático de projeto.
+- Sugestões aceitas podem ser aplicadas explicitamente a `confirmed_document_metadata`; a operação registra valores anteriores/novos em `metadata_audit_log` e é idempotente para a mesma sugestão.
+- A aplicação não altera CSVs importados, não modifica o original e não cria vínculo automático de projeto.
 - Nenhum arquivo é aberto, renomeado, movido ou alterado por essa análise.
 - A comparação automatizada com os dados do carimbo e a aplicação controlada de valores aceitos permanecem etapas futuras.
 
