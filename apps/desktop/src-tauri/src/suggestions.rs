@@ -62,7 +62,7 @@ fn parse_filename(filename: &str) -> (Option<String>, Option<String>, Option<Str
                     revision = Some((*next).to_string());
                 }
             }
-        } else if let Some(value) = token.strip_prefix("REV").or_else(|| token.strip_prefix("REVISION")).or_else(|| token.strip_prefix("REVISAO")) {
+        } else if let Some(value) = token.strip_prefix("REVISION").or_else(|| token.strip_prefix("REVISAO")).or_else(|| token.strip_prefix("REV")) {
             if !value.is_empty() && value.len() <= 3 && value.chars().all(|c| c.is_ascii_alphanumeric()) {
                 revision = Some(value.to_string());
             }
@@ -165,6 +165,13 @@ mod tests {
         assert_eq!(drawing.as_deref(), Some("EST-001"));
         assert_eq!(revision.as_deref(), Some("02"));
         assert_eq!(confidence, 0.92);
+    }
+
+    #[test]
+    fn parses_long_revision_marker() {
+        let (_, _, drawing, revision, _) = parse_filename("AB20A-DRE-014_REVISION03.pdf");
+        assert_eq!(drawing.as_deref(), Some("DRE-014"));
+        assert_eq!(revision.as_deref(), Some("03"));
     }
 
     #[test]
