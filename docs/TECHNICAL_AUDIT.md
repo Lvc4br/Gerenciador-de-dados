@@ -41,7 +41,7 @@ O principal ajuste arquitetural recomendado é separar claramente as responsabil
 - O núcleo Python não está conectado como sidecar ao aplicativo Tauri; a varredura atual da aplicação é feita em Rust.
 - Não há leitura direta do conteúdo DWG, PDF ou Office no fluxo do desktop.
 - Não há visualizador de documentos integrado.
-- Não há histórico de versões de documentos; o registro atual atualiza a linha do mesmo caminho.
+- Há histórico de fingerprints SHA-256 distintos por arquivo, com tamanho e datas; ainda não há cópias binárias para restauração.
 - Não há busca textual FTS5, apesar de prevista na arquitetura.
 - Não há módulo funcional de cadastro de projetos, exportações ou configurações; partes da navegação ainda são placeholders.
 - Não há trilha de auditoria operacional completa.
@@ -71,7 +71,7 @@ Na continuação da Fase 0, foram adicionadas à branch:
 | **Alta** | Arquivos removidos da pasta não são reconciliados no catálogo | O GED pode continuar exibindo caminhos que já não existem | Registrar início/fim de cada varredura e marcar como ausentes os itens não vistos, sem apagar histórico |
 | **Alta** | Erros do WalkDir são descartados por `filter_map(Result::ok)` | Falhas de acesso a subpastas podem passar despercebidas | Contabilizar e registrar cada erro com caminho e código seguro |
 | **Alta** | O mesmo scanner existe em Rust e Python, mas só o Rust está ligado ao app | Duas implementações podem divergir e gerar resultados diferentes | Definir um único scanner oficial. Recomendação: Rust para indexação local; Python apenas para parsing/análise |
-| **Alta** | Reindexação substitui hash e metadados do caminho atual | Alterações de arquivo podem apagar a noção da versão anterior | Criar entidade de documento + versões imutáveis, mantendo hash, tamanho, data e origem por versão |
+| **Alta — parcial** | Reindexação atualiza os metadados atuais; histórico guarda SHA-256, tamanho e datas, mas não o binário | É possível provar que o conteúdo mudou, mas não restaurar uma versão antiga | Adicionar armazenamento de conteúdo versionado ou snapshot com política de retenção e backup |
 | **Alta** | Importação CSV faz upsert por linha, mas não reconcilia linhas removidas do CSV | Ao atualizar um CSV para menos registros, linhas antigas podem continuar no banco | Importar por lote com transação/savepoint e reconciliar todas as linhas do arquivo de origem |
 | **Média** | Busca do Explorer usa LIKE; FTS5 não foi criado | Busca em grandes catálogos ficará limitada e menos relevante | Criar índice FTS5 para nome, título, identificadores e texto extraído; manter filtros estruturados em SQL |
 | **Média** | Erros de importação CSV são somados ao contador genérico de indexação | O usuário não sabe se falhou o hash, a leitura ou a interpretação do CSV | Separar erros de acesso, hash, formato e extração; exibir relatório por arquivo |
