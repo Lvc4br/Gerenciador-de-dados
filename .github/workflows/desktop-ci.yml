@@ -39,6 +39,9 @@ jobs:
       - name: Install frontend dependencies
         working-directory: apps/desktop
         run: npm install
+      - name: Validate frontend TypeScript and Vite build
+        working-directory: apps/desktop
+        run: npm run build
       - name: Run Rust backend tests
         working-directory: apps/desktop
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
