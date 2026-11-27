@@ -1,189 +1,95 @@
-# Backend e contratos da API
+# Motor local, IPC e contratos internos
 
-## 1. Organização recomendada
+## 1. Papel do backend
 
-Monólito modular em Python/FastAPI. Cada módulo contém router, schemas, service, repository e políticas de autorização. Regras de domínio não devem ficar nos endpoints.
+No GED desktop, o backend é um **motor local empacotado**, não um servidor remoto obrigatório. A interface React comunica-se com Tauri e com o sidecar Python. O usuário não precisa instalar Python, Node ou banco de dados.
+
+## 2. Contrato de comunicação
+
+Operações rápidas (abrir diálogo de pasta, obter configuração, abrir arquivo/URL permitido) usam comandos Tauri. Operações longas (varrer diretório, extrair DWG/PDF, indexar, comparar e exportar) viram jobs no motor Python e emitem eventos de progresso.
+
+Contrato conceitual:
+
+- `start_scan(root_id, options) -> job_id`
+- `get_job(job_id) -> JobStatus`
+- `cancel_job(job_id) -> CancelResult`
+- `search(query, filters, sort, cursor) -> SearchPage`
+- `get_document(document_id) -> DocumentDetail`
+- `get_preview(version_id) -> PreviewDescriptor`
+- `compare_versions(version_a, version_b) -> ComparisonJob`
+- `export_selection(selection, format, options) -> ExportJob`
+
+Todos os comandos validam caminhos, IDs e permissões do perfil local. Não aceitar caminho arbitrário vindo da interface sem validação.
+
+## 3. Estrutura do motor
 
 ```text
-backend/
-  app/
-    main.py
-    core/              # config, auth, permissions, errors, logging
-    modules/
-      identity/
-      workspaces/
-      projects/
-      documents/
-      ingestion/
-      metadata/
-      taxonomy/
-      search/
-      findings/
-      comparison/
-      recommendations/
-      preview/
-      exports/
-      audit/
+engine/
+  ged_engine/
+    main.py                # inicialização do sidecar
+    ipc/                   # protocolo, autenticação efêmera e eventos
+    core/
+    catalog/
+    ingestion/
+    metadata/
+    taxonomy/
+    findings/
+    search/
+    comparison/
+    recommendations/
+    preview/
+    exports/
     adapters/
-      base.py
-      csv_adapter.py
-      pdf_adapter.py
-      image_adapter.py
-      office_adapter.py
-      cad_adapter.py
-      ifc_adapter.py
-    workers/
-      tasks/
-      pipelines/
     db/
-      models/
-      migrations/
+    workers/
     tests/
-      unit/
-      integration/
-      fixtures/
-  alembic/
-  pyproject.toml
-  Dockerfile
 ```
 
-## 2. Convenções
+## 4. Banco local
 
-- Prefixo: `/api/v1`.
-- JSON UTF-8; datas ISO-8601 UTC.
-- UUID como identificador público.
-- Paginação por cursor para listagens grandes.
-- Filtros explícitos e ordenação por campos permitidos (allowlist).
-- Erros com `code`, `message`, `details`, `correlation_id`.
-- Idempotency-Key para upload, ingestão e exportação.
-- OpenAPI gerado pela aplicação e versionado em CI.
-- Todas as rotas validam workspace, projeto e permissão no backend.
+SQLite com foreign keys, WAL quando apropriado, FTS5, índices e migrações versionadas. SQLAlchemy 2 pode fornecer camada de persistência comum. O catálogo não deve guardar o conteúdo binário de todos os documentos em BLOB: os originais permanecem no filesystem e o banco guarda caminho, hash, tamanho e metadados.
 
-## 3. Endpoints previstos
+Tabelas principais: projects, documents, document_locations, document_versions, extractions, metadata_values, taxonomies, findings, document_relations, ingestion_jobs, export_jobs, audit_events e settings.
 
-| Método | Endpoint | Uso |
-|---|---|---|
-| GET/POST | /workspaces | Listar/criar workspaces |
-| GET/PATCH | /projects | Listar e atualizar projetos |
-| POST | /projects | Criar projeto |
-| GET | /projects/{id} | Detalhes do projeto |
-| GET/POST | /projects/{id}/documents | Listar/adicionar documentos |
-| POST | /documents/upload-sessions | Criar sessão de upload |
-| POST | /documents/{id}/versions | Registrar nova versão |
-| GET | /documents/{id} | Detalhes do documento |
-| GET | /documents/{id}/versions | Histórico de versões |
-| GET | /versions/{id}/preview | Obter preview autorizado |
-| GET | /versions/{id}/download | Download do original |
-| POST | /ingestion-jobs | Criar job de ingestão em lote |
-| GET | /jobs/{id} | Progresso e erros do job |
-| GET | /search | Busca textual/facetada |
-| GET | /findings | Listar divergências |
-| POST | /findings/{id}/review | Confirmar/rejeitar/resolver achado |
-| POST | /comparisons | Criar comparação |
-| GET | /comparisons/{id} | Resultado da comparação |
-| GET | /recommendations | Projetos/documentos recomendados |
-| POST | /recommendations/feedback | Feedback de relevância |
-| POST | /exports | Solicitar exportação |
-| GET | /exports/{id} | Status e manifesto |
-| GET | /audit-events | Auditoria conforme permissão |
+## 5. Modelo de job
 
-## 4. Exemplos de contrato
+Estados: queued, running, succeeded, partial, failed, cancelled. Cada job guarda progresso, itens processados, erros por arquivo, duração, versão do pipeline e timestamps. Retomar varredura não deve duplicar registros. Cancelamento deve ser cooperativo e seguro.
 
-### Criar projeto
+## 6. Endpoints/ações de domínio
 
-```json
-{
-  "code": "SP330-TR-01",
-  "name": "Trevo Anhanguera — referência",
-  "project_type": "rodoviario",
-  "discipline": ["estruturas", "geometria"],
-  "stage": "executivo",
-  "location": {
-    "municipality": "São Paulo",
-    "state_code": "SP",
-    "country_code": "BR"
-  }
-}
-```
+| Ação | Descrição |
+|---|---|
+| projects.list/create/update | Cadastro de obras |
+| roots.add/list/verify | Pastas indexadas e verificação de caminhos |
+| scan.start/status/cancel | Varredura e indexação |
+| documents.list/detail | Explorador e detalhes |
+| documents.reveal_in_folder | Abrir localização no Explorer do Windows |
+| documents.open_original | Abrir no aplicativo associado, mediante ação do usuário |
+| metadata.correct/verify | Correção e validação de metadados |
+| findings.list/review | Revisão de divergências |
+| search.query | Busca textual e filtros |
+| comparison.start/result | Comparação |
+| recommendations.query/feedback | Recomendações |
+| exports.start/status/open | Exportação e localização do resultado |
+| backup.create/restore | Backup e recuperação do catálogo |
 
-### Resultado de busca
+## 7. Segurança de IPC
 
-```json
-{
-  "items": [
-    {
-      "document_id": "uuid",
-      "version_id": "uuid",
-      "name": "desenho-ponte.dwg",
-      "title": "Ponte — implantação",
-      "discipline": "estruturas",
-      "revision": "R4",
-      "matched_by": ["title", "drawing_number"],
-      "score": 0.91
-    }
-  ],
-  "facets": {
-    "discipline": [{"value": "estruturas", "count": 18}],
-    "format": [{"value": "dwg", "count": 12}]
-  },
-  "next_cursor": null
-}
-```
+Se o sidecar usar HTTP loopback:
+- Bind exclusivo em 127.0.0.1.
+- Porta dinâmica e token aleatório por execução.
+- Validar origem e limitar métodos/rotas.
+- Não aceitar conexões de outras máquinas.
+- Encerrar sidecar e invalidar token ao fechar o app.
+- Nunca expor a porta em firewall/rede.
 
-Scores devem ser calibrados e não representam probabilidade de correção técnica.
+Preferir pipe/socket local quando viável. Segredos não devem aparecer em logs.
 
-### Achado de divergência
+## 8. Testes
 
-```json
-{
-  "rule_code": "DRAWING_NUMBER_MISMATCH",
-  "severity": "high",
-  "status": "open",
-  "title": "Número do desenho divergente",
-  "evidence": {
-    "filename": {"value": "E-266", "locator": {"kind": "filename"}},
-    "title_block": {"value": "E-239", "locator": {"kind": "title_block", "sheet": 1}}
-  },
-  "confidence": 0.98,
-  "requires_human_review": true
-}
-```
-
-## 5. Upload seguro e confiável
-
-1. API cria sessão e reserva cota.
-2. Cliente envia arquivo para área de quarentena (preferir upload multipart/resumível).
-3. Worker valida tamanho, assinatura binária, MIME, extensão e antivírus.
-4. Calcula SHA-256; detecta duplicidade e política de retenção.
-5. Move/copia para storage original imutável.
-6. Cria versão e job de ingestão com chave idempotente.
-7. Worker extrai metadados e gera derivados em bucket separado.
-8. API retorna status; frontend acompanha por polling ou SSE.
-
-Não aceitar caminho de arquivo arbitrário do cliente nem confiar em nome, MIME ou hash enviados pelo navegador.
-
-## 6. Modelo de autorização
-
-Papéis sugeridos: owner, admin, engineer, reviewer, archivist, viewer. As permissões devem ser granulares:
-- project.read / project.manage
-- document.read / document.upload / document.manage
-- metadata.edit / metadata.verify
-- finding.read / finding.review
-- export.create / export.download
-- audit.read / workspace.manage
-
-A autorização deve considerar workspace, projeto, classificação/sensibilidade e vínculo do usuário. Aplicar filtro de acesso antes de busca textual ou vetorial para impedir vazamento por resultados, contagens ou sugestões.
-
-## 7. Processamento assíncrono
-
-Estados de job: queued, running, succeeded, partial, failed, cancelled. Registrar tentativas, progresso, itens ignorados, erros seguros e duração. Usar retry com backoff somente para erros transitórios; erros de formato inválido não devem entrar em retry infinito.
-
-## 8. Regras de qualidade do código
-
-- Pydantic para validação de contratos.
-- SQLAlchemy 2 + Alembic para persistência/migrações.
-- Camada de serviço para regras de negócio.
-- Repository para consultas.
-- Testes de autorização por endpoint.
-- Testes com fixtures reais anonimizadas e arquivos malformados.
-- Não registrar conteúdo de documento nem credenciais em logs.
+- Unitários para regras, parser, hash e normalização.
+- Integração para SQLite e migrações.
+- Fixtures reais anonimizadas: CSV AB20A, PDF, DOCX, XLSX e DWG de teste.
+- Testar caminhos longos, caracteres acentuados, rede indisponível, disco removido, arquivos duplicados e corrompidos.
+- Testar cancelamento, retomada e encerramento inesperado.
+- Testar instalação limpa e atualização no Windows.
