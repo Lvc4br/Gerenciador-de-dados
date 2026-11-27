@@ -18,7 +18,7 @@ type MockFilenameSuggestion = {
 };
 let sampleFilenameSuggestions: MockFilenameSuggestion[] = [
   { id: 1, file_id: 1, filename: "AB20A-EST-001.dwg", relative_path: "Estruturas/AB20A-EST-001.dwg", project_prefix: "AB20A", discipline_code: "EST", drawing_number: "EST-001", revision: "02", confidence: 0.92, status: "pending" as const, applied: false, created_at: "2026-11-27" },
-  { id: 2, file_id: 2, filename: "AB20A-EST-001.pdf", relative_path: "Estruturas/AB20A-EST-001.pdf", project_prefix: "AB20A", discipline_code: "EST", drawing_number: "EST-001", revision: null, confidence: 0.78, status: "pending" as const, created_at: "2026-11-27" },
+  { id: 2, file_id: 2, filename: "AB20A-EST-001.pdf", relative_path: "Estruturas/AB20A-EST-001.pdf", project_prefix: "AB20A", discipline_code: "EST", drawing_number: "EST-001", revision: null, confidence: 0.78, status: "pending" as const, applied: false, created_at: "2026-11-27" },
   { id: 3, file_id: 5, filename: "AB20A-DRE-014.dwg", relative_path: "Drenagem/AB20A-DRE-014.dwg", project_prefix: "AB20A", discipline_code: "DRE", drawing_number: "DRE-014", revision: null, confidence: 0.78, status: "accepted" as const, applied: false, created_at: "2026-11-27" }
 ];
 let sampleProjects = [
