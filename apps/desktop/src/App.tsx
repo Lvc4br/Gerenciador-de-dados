@@ -55,6 +55,10 @@ function formatBytes(bytes: number) {
 function ExplorerPanel() {
   const [search, setSearch] = useState('');
   const [extension, setExtension] = useState('');
+  const [clientFilter, setClientFilter] = useState('');
+  const [projectFilter, setProjectFilter] = useState('');
+  const [disciplineFilter, setDisciplineFilter] = useState('');
+  const [disciplineOptions, setDisciplineOptions] = useState<Array<{id:number;code:string;name:string}>>([]);
   const [sortBy, setSortBy] = useState('path');
   const [ascending, setAscending] = useState(true);
   const [page, setPage] = useState(0);
@@ -79,6 +83,14 @@ function ExplorerPanel() {
       .catch(() => setProjectOptions([]));
   }, []);
 
+  useEffect(() => {
+    setDisciplineFilter('');
+    if (!projectFilter) { setDisciplineOptions([]); return; }
+    invoke<Array<{id:number;code:string;name:string}>>('list_project_disciplines', { projectId: Number(projectFilter) })
+      .then(setDisciplineOptions)
+      .catch(() => setDisciplineOptions([]));
+  }, [projectFilter]);
+
   async function linkSelectedFile() {
     if (!selected || !targetProjectId) return;
     setLinking(true); setLinkNotice(''); setError('');
@@ -96,7 +108,10 @@ function ExplorerPanel() {
     setLoading(true); setError('');
     try {
       const result = await invoke<FilePage>('list_files', {
-        search, extension, sortBy, ascending, limit: pageSize, offset: page * pageSize
+        search, extension, client: clientFilter,
+        projectId: projectFilter ? Number(projectFilter) : null,
+        disciplineId: disciplineFilter ? Number(disciplineFilter) : null,
+        sortBy, ascending, limit: pageSize, offset: page * pageSize
       });
       setData(result);
       setSelected(current => current
@@ -106,7 +121,7 @@ function ExplorerPanel() {
     finally { setLoading(false); }
   }
 
-  useEffect(() => { void loadFiles(); }, [search, extension, sortBy, ascending, page]);
+  useEffect(() => { void loadFiles(); }, [search, extension, clientFilter, projectFilter, disciplineFilter, sortBy, ascending, page]);
 
   useEffect(() => {
     let active = true;
@@ -128,6 +143,9 @@ function ExplorerPanel() {
       </div>
       <div className="explorer-toolbar">
         <label className="explorer-search"><Search size={16} /><input value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Nome do arquivo ou caminho..." /></label>
+        <label className="filter-control"><span>Cliente</span><input value={clientFilter} onChange={e => { setClientFilter(e.target.value); setPage(0); }} placeholder="Nome do cliente" /></label>
+        <label className="filter-control"><span>Projeto</span><select value={projectFilter} onChange={e => { setProjectFilter(e.target.value); setPage(0); }}><option value="">Todos</option>{projectOptions.map(project => <option key={project.id} value={project.id}>{project.code} — {project.name}</option>)}</select></label>
+        <label className="filter-control"><span>Disciplina</span><select value={disciplineFilter} onChange={e => { setDisciplineFilter(e.target.value); setPage(0); }} disabled={!projectFilter}><option value="">Todas</option>{disciplineOptions.map(d => <option key={d.id} value={d.id}>{d.code} — {d.name}</option>)}</select></label>
         <label className="filter-control"><span>Extensão</span><input value={extension} onChange={e => { setExtension(e.target.value); setPage(0); }} placeholder="ex.: pdf, dwg" /></label>
         <label className="filter-control"><span>Ordenar por</span><select value={sortBy} onChange={e => setSortBy(e.target.value)}><option value="path">Caminho</option><option value="filename">Nome</option><option value="extension">Extensão</option><option value="size">Tamanho</option><option value="modified">Modificação</option></select></label>
         <button className="sort-button" title="Inverter ordenação" onClick={() => setAscending(value => !value)}><ArrowUpDown size={16} /> {ascending ? 'Crescente' : 'Decrescente'}</button>
