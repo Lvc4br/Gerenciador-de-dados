@@ -6,6 +6,8 @@ from pathlib import Path
 import sqlite3
 from datetime import datetime, timezone
 
+from .naming import extract_filename_metadata
+
 CHUNK_SIZE = 1024 * 1024
 DEFAULT_MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024
 
@@ -74,6 +76,43 @@ def scan_folder(
                     (
                         root_id, relative, filename, path.suffix.lower(),
                         stat.st_size, modified, digest,
+                    ),
+                )
+                file_row = connection.execute(
+                    "SELECT id FROM files WHERE root_id=? AND relative_path=?",
+                    (root_id, relative),
+                ).fetchone()
+                suggestion = extract_filename_metadata(filename)
+                connection.execute(
+                    """
+                    INSERT INTO filename_suggestions(
+                        file_id, project_prefix, discipline_code, drawing_number,
+                        revision, confidence, source, parser_version
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, '1')
+                    ON CONFLICT(file_id, parser_version) DO UPDATE SET
+                        project_prefix=excluded.project_prefix,
+                        discipline_code=excluded.discipline_code,
+                        drawing_number=excluded.drawing_number,
+                        revision=excluded.revision,
+                        confidence=excluded.confidence,
+                        source=excluded.source,
+                        status='pending',
+                        reviewed_at=NULL,
+                        created_at=CURRENT_TIMESTAMP
+                    WHERE filename_suggestions.project_prefix IS NOT excluded.project_prefix
+                       OR filename_suggestions.discipline_code IS NOT excluded.discipline_code
+                       OR filename_suggestions.drawing_number IS NOT excluded.drawing_number
+                       OR filename_suggestions.revision IS NOT excluded.revision
+                       OR filename_suggestions.confidence != excluded.confidence
+                    """,
+                    (
+                        int(file_row["id"]),
+                        suggestion["project_prefix"],
+                        suggestion["discipline_code"],
+                        suggestion["drawing_number"],
+                        suggestion["revision"],
+                        suggestion["confidence"],
+                        suggestion["source"],
                     ),
                 )
                 indexed += 1
