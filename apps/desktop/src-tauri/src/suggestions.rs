@@ -12,6 +12,7 @@ pub struct SuggestionRecord {
     pub drawing_number: Option<String>,
     pub revision: Option<String>,
     pub confidence: f64,
+    pub source: String,
     pub status: String,
     pub applied: bool,
     pub titleblock_internal_number: Option<String>,
@@ -151,7 +152,7 @@ pub fn list(connection: &Connection, status: &str, search: &str, limit: u32, off
         params![status, search, pattern], |row| row.get(0)
     ).map_err(|e| e.to_string())?;
     let mut statement = connection.prepare(
-        "SELECT s.id,s.file_id,f.filename,f.relative_path,s.project_prefix,s.discipline_code,s.drawing_number,s.revision,s.confidence,s.status,EXISTS(SELECT 1 FROM confirmed_document_metadata m WHERE m.source_suggestion_id=s.id),
+        "SELECT s.id,s.file_id,f.filename,f.relative_path,s.project_prefix,s.discipline_code,s.drawing_number,s.revision,s.confidence,s.source,s.status,EXISTS(SELECT 1 FROM confirmed_document_metadata m WHERE m.source_suggestion_id=s.id),
          (SELECT dm.internal_number FROM drawing_metadata dm WHERE lower(trim(dm.filename))=lower(trim(f.filename)) ORDER BY dm.imported_at DESC LIMIT 1),
          (SELECT dm.artesp_number FROM drawing_metadata dm WHERE lower(trim(dm.filename))=lower(trim(f.filename)) ORDER BY dm.imported_at DESC LIMIT 1),
          (SELECT dm.candidate_title FROM drawing_metadata dm WHERE lower(trim(dm.filename))=lower(trim(f.filename)) ORDER BY dm.imported_at DESC LIMIT 1),
@@ -168,10 +169,10 @@ pub fn list(connection: &Connection, status: &str, search: &str, limit: u32, off
     let rows = statement.query_map(params![status, search, pattern, limit.clamp(1,500), offset], |row| Ok(SuggestionRecord {
         id: row.get(0)?, file_id: row.get(1)?, filename: row.get(2)?, relative_path: row.get(3)?,
         project_prefix: row.get(4)?, discipline_code: row.get(5)?, drawing_number: row.get(6)?,
-        revision: row.get(7)?, confidence: row.get(8)?, status: row.get(9)?, applied: row.get(10)?,
-        titleblock_internal_number: row.get(11)?, titleblock_artesp_number: row.get(12)?, titleblock_title: row.get(13)?,
-        pdf_drawing_number: row.get(14)?, pdf_revision: row.get(15)?, pdf_title: row.get(16)?,
-        pdf_confidence: row.get(17)?, created_at: row.get(18)?,
+        revision: row.get(7)?, confidence: row.get(8)?, source: row.get(9)?, status: row.get(10)?, applied: row.get(11)?,
+        titleblock_internal_number: row.get(12)?, titleblock_artesp_number: row.get(13)?, titleblock_title: row.get(14)?,
+        pdf_drawing_number: row.get(15)?, pdf_revision: row.get(16)?, pdf_title: row.get(17)?,
+        pdf_confidence: row.get(18)?, created_at: row.get(19)?,
     })).map_err(|e| e.to_string())?;
     let mut items = Vec::new();
     for row in rows { items.push(row.map_err(|e| e.to_string())?); }
