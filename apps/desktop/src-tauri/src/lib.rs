@@ -500,6 +500,9 @@ fn list_files(
     app: tauri::AppHandle,
     search: Option<String>,
     extension: Option<String>,
+    project_id: Option<i64>,
+    discipline_id: Option<i64>,
+    client: Option<String>,
     sort_by: Option<String>,
     ascending: Option<bool>,
     limit: Option<u32>,
@@ -511,14 +514,32 @@ fn list_files(
     let fts_query = build_fts_query(&search).unwrap_or_default();
     let extension = extension.unwrap_or_default().trim().trim_start_matches('.').to_lowercase();
     let extension_filter = if extension.is_empty() { None } else { Some(extension) };
+    let client = client.unwrap_or_default().trim().to_string();
+    let client_pattern = format!("%{}%", client.replace('%', "\\%").replace('_', "\\_"));
 
     let total: u64 = connection.query_row(
         "SELECT COUNT(*) FROM files f
          WHERE (?1 = '' OR
            (?2 != '' AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?2)) OR
            (?2 = '' AND (f.filename LIKE ?3 ESCAPE '\\' OR f.relative_path LIKE ?3 ESCAPE '\\')))
-         AND (?4 IS NULL OR lower(f.extension) = ?4)",
-        params![search, fts_query, pattern, extension_filter],
+         AND (?4 IS NULL OR lower(f.extension) = ?4)
+         AND (?5 IS NULL OR EXISTS (
+           SELECT 1 FROM project_roots pr WHERE pr.project_id=?5 AND pr.root_id=f.root_id
+           UNION
+           SELECT 1 FROM project_file_links pfl WHERE pfl.project_id=?5 AND pfl.file_id=f.id
+         ))
+         AND (?6 IS NULL OR EXISTS (
+           SELECT 1 FROM project_file_links pfl
+           WHERE pfl.project_id=COALESCE(?5,pfl.project_id) AND pfl.file_id=f.id AND pfl.discipline_id=?6
+         ))
+         AND (?7='' OR EXISTS (
+           SELECT 1 FROM projects p
+           LEFT JOIN project_roots pr ON pr.project_id=p.id AND pr.root_id=f.root_id
+           LEFT JOIN project_file_links pfl ON pfl.project_id=p.id AND pfl.file_id=f.id
+           WHERE (pr.project_id IS NOT NULL OR pfl.project_id IS NOT NULL)
+             AND p.client LIKE ?8 ESCAPE '\\'
+         ))",
+        params![search, fts_query, pattern, extension_filter, project_id, discipline_id, client, client_pattern],
         |row| row.get(0)
     ).map_err(|e| e.to_string())?;
 
@@ -538,12 +559,28 @@ fn list_files(
            (?2 != '' AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?2)) OR
            (?2 = '' AND (f.filename LIKE ?3 ESCAPE '\\' OR f.relative_path LIKE ?3 ESCAPE '\\')))
            AND (?4 IS NULL OR lower(f.extension) = ?4)
+           AND (?5 IS NULL OR EXISTS (
+             SELECT 1 FROM project_roots pr WHERE pr.project_id=?5 AND pr.root_id=f.root_id
+             UNION
+             SELECT 1 FROM project_file_links pfl WHERE pfl.project_id=?5 AND pfl.file_id=f.id
+           ))
+           AND (?6 IS NULL OR EXISTS (
+             SELECT 1 FROM project_file_links pfl
+             WHERE pfl.project_id=COALESCE(?5,pfl.project_id) AND pfl.file_id=f.id AND pfl.discipline_id=?6
+           ))
+           AND (?7='' OR EXISTS (
+             SELECT 1 FROM projects p
+             LEFT JOIN project_roots pr ON pr.project_id=p.id AND pr.root_id=f.root_id
+             LEFT JOIN project_file_links pfl ON pfl.project_id=p.id AND pfl.file_id=f.id
+             WHERE (pr.project_id IS NOT NULL OR pfl.project_id IS NOT NULL)
+               AND p.client LIKE ?8 ESCAPE '\\'
+           ))
          ORDER BY {order_column} {direction}
-         LIMIT ?5 OFFSET ?6"
+         LIMIT ?9 OFFSET ?10"
     );
     let mut statement = connection.prepare(&sql).map_err(|e| e.to_string())?;
     let rows = statement.query_map(
-        params![search, fts_query, pattern, extension_filter, limit.unwrap_or(100).clamp(1, 500), offset.unwrap_or(0)],
+        params![search, fts_query, pattern, extension_filter, project_id, discipline_id, client, client_pattern, limit.unwrap_or(100).clamp(1, 500), offset.unwrap_or(0)],
         |row| Ok(FileRecord {
             id: row.get(0)?,
             filename: row.get(1)?,
