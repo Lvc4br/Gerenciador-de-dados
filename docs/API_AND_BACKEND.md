@@ -125,7 +125,7 @@ O executável usa a biblioteca Rust `pdf-extract` no backend Tauri. A extração
 
 - Comando Tauri `extract_pdf_text(fileId)`: localiza o documento indexado, exige status `indexed`, valida a extensão PDF, confere o SHA-256 do arquivo físico e só então extrai o texto.
 - Comando Tauri `extract_pending_pdf_text(limit)`: processa PDFs ainda não extraídos ou cujo hash mudou. A interface solicita lotes de até 50 documentos; o backend limita cada chamada a 200.
-- `list_files(searchInContent=true)`: quando habilitado, combina a busca de nome/caminho com os IDs encontrados em `document_text_fts`.
+- `list_files(searchInContent=true)`: quando habilitado, combina a busca de nome/caminho com os IDs encontrados em `document_text_fts`, retorna um trecho de contexto e informa se o texto armazenado corresponde ao SHA-256 atual.
 - Migrations 6 e 7 criam `extracted_document_text` e a tabela FTS5 externa `document_text_fts`, com triggers para manter inserções, atualizações e remoções sincronizadas; também registram total de páginas e páginas com texto.
 - Limites atuais: 200 MB por PDF, 5.000 páginas e 10 milhões de caracteres extraídos. A checagem SHA-256 impede usar resultado de um arquivo que mudou após a última varredura.
 - PDFs sem texto selecionável são salvos com conteúdo vazio e sinalizados como `needs_ocr`; OCR não está incluído nesta etapa.
