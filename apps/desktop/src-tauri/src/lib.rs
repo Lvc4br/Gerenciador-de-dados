@@ -131,8 +131,12 @@ fn scan_folder(app: tauri::AppHandle, folder: String) -> Result<ScanSummary, Str
         };
         let relative = match path.strip_prefix(&root) {
             Ok(value) => value.to_string_lossy().replace('\\', "/"),
-            Err(_) => { errors += 1; continue; }
+            Err(_) => { errors += 1; traversal_errors += 1; continue; }
         };
+        let _ = transaction.execute(
+            "UPDATE files SET last_seen_scan_id=?1,status='error' WHERE root_id=?2 AND relative_path=?3",
+            params![scan_id, root_id, relative]
+        );
         if metadata.len() > MAX_FILE_SIZE {
             skipped += 1;
             let _ = transaction.execute(
