@@ -88,9 +88,11 @@ export async function previewInvoke<T>(command: string, args: Record<string, unk
         (linkedRoots.includes(1) || sampleProjectFileLinks[projectId + ":" + file.id] !== undefined) &&
         (!search || file.filename.toLocaleLowerCase("pt-BR").includes(search) || file.relative_path.toLocaleLowerCase("pt-BR").includes(search))
       ).map(file => {
-        const disciplineId = sampleProjectFileLinks[projectId + ":" + file.id] ?? null;
+        const key = projectId + ":" + file.id;
+        const linked = Object.prototype.hasOwnProperty.call(sampleProjectFileLinks, key);
+        const disciplineId = linked ? sampleProjectFileLinks[key] : null;
         const discipline = sampleDisciplines.find(d => d.id === disciplineId && d.project_id === projectId);
-        return { ...file, linked: disciplineId !== null, discipline_id: disciplineId, discipline_code: discipline?.code ?? null, discipline_name: discipline?.name ?? null };
+        return { ...file, linked, discipline_id: disciplineId, discipline_code: discipline?.code ?? null, discipline_name: discipline?.name ?? null };
       });
       result = { items: filtered.slice(Number(args.offset ?? 0), Number(args.offset ?? 0) + Number(args.limit ?? 100)), total: filtered.length };
       break;
@@ -98,7 +100,18 @@ export async function previewInvoke<T>(command: string, args: Record<string, unk
     case "set_project_file_link": {
       const projectId = Number(args.projectId), fileId = Number(args.fileId), disciplineId = args.disciplineId == null ? null : Number(args.disciplineId);
       if (disciplineId !== null && !sampleDisciplines.some(d => d.id === disciplineId && d.project_id === projectId)) throw new Error("A disciplina selecionada não pertence ao projeto.");
-      sampleProjectFileLinks[projectId + ":" + fileId] = disciplineId;
+      const key = projectId + ":" + fileId;
+      if (args.linked) sampleProjectFileLinks[key] = disciplineId;
+      else delete sampleProjectFileLinks[key];
+      const linkedRootIds = sampleProjectRootLinks[projectId] ?? [];
+      const linkedFileIds = Object.keys(sampleProjectFileLinks)
+        .filter(item => item.startsWith(projectId + ":"))
+        .map(item => Number(item.split(":")[1]));
+      const fileCount = new Set([
+        ...sampleFiles.filter(file => linkedRootIds.includes(1)).map(file => file.id),
+        ...linkedFileIds
+      ]).size;
+      sampleProjects = sampleProjects.map(project => project.id === projectId ? { ...project, file_count: fileCount } : project);
       result = null;
       break;
     }
