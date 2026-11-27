@@ -589,7 +589,7 @@ function ReviewPanel() {
               <div><small>Disciplina</small><b>{item.discipline_code || "—"}</b></div>
               <div><small>Número do desenho</small><b>{item.drawing_number || "—"}</b></div>
               <div><small>Revisão</small><b>{item.revision || "—"}</b></div>
-              <div><small>Confiança</small><b>{Math.round(item.confidence * 100)}%</b></div>
+              <div><small>Pontuação heurística</small><b>{Math.round(item.confidence * 100)}%</b></div>
             </div>
             <div className="review-metadata titleblock-comparison">
               <div><small>Nº interno no carimbo</small><b>{item.titleblock_internal_number || "Não importado"}</b></div>
@@ -600,7 +600,7 @@ function ReviewPanel() {
               <div><small>Número sugerido pelo PDF</small><b>{item.pdf_drawing_number || "Ainda não extraído"}</b></div>
               <div><small>Revisão sugerida pelo PDF</small><b>{item.pdf_revision || "—"}</b></div>
               <div><small>Título sugerido pelo PDF</small><b>{item.pdf_title || "—"}</b></div>
-              <div><small>Confiança do parser PDF</small><b>{Math.round(item.pdf_confidence * 100)}%</b></div>
+              <div><small>Pontuação heurística do PDF</small><b>{Math.round(item.pdf_confidence * 100)}%</b></div>
               {item.pdf_drawing_number && item.drawing_number &&
                 item.pdf_drawing_number.toUpperCase() !== item.drawing_number.toUpperCase() &&
                 <div className="metadata-warning">O número sugerido pelo PDF difere do número identificado no nome. Confira as evidências antes de confirmar.</div>}
