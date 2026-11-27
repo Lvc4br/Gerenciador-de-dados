@@ -42,6 +42,8 @@ O principal ajuste arquitetural recomendado é separar claramente as responsabil
 - Não há leitura direta do conteúdo DWG, PDF ou Office no fluxo do desktop.
 - Não há visualizador de documentos integrado.
 - Há histórico de fingerprints SHA-256 distintos por arquivo, com tamanho e datas; ainda não há cópias binárias para restauração.
+- Backup consistente do SQLite via API online backup do SQLite, com verificação `integrity_check` após criação.
+- Restauração de backup GED validado, com cópia automática do banco atual antes da substituição.
 - Não há busca textual FTS5, apesar de prevista na arquitetura.
 - Não há módulo funcional de cadastro de projetos, exportações ou configurações; partes da navegação ainda são placeholders.
 - Não há trilha de auditoria operacional completa.
@@ -60,7 +62,7 @@ Na continuação da Fase 0, foram adicionadas à branch:
 - Contadores do dashboard e grupos de duplicidade consideram somente arquivos atualmente indexados.
 - Reimportação CSV remove linhas antigas excedentes, limpa os dados do tipo anterior quando o esquema da fonte muda e usa savepoint para rollback integral em falhas.
 
-**Limitações ainda abertas:** ainda não há cancelamento da varredura; o histórico atual não armazena cópias binárias, então não permite restaurar conteúdo antigo; backup e restauração do banco ainda precisam ser implementados. Essas correções também aguardam confirmação do CI Windows.
+**Limitações ainda abertas:** ainda não há cancelamento da varredura; o histórico atual não armazena cópias binárias, então não permite restaurar versões individuais de documentos. Backup e restauração do banco foram implementados, mas ainda precisam de teste funcional em Windows e de teste com bancos maiores. As alterações aguardam confirmação do CI Windows.
 
 ## 4. Achados da auditoria — prioridade
 
@@ -76,7 +78,7 @@ Na continuação da Fase 0, foram adicionadas à branch:
 | **Média** | Busca do Explorer usa LIKE; FTS5 não foi criado | Busca em grandes catálogos ficará limitada e menos relevante | Criar índice FTS5 para nome, título, identificadores e texto extraído; manter filtros estruturados em SQL |
 | **Média** | Erros de importação CSV são somados ao contador genérico de indexação | O usuário não sabe se falhou o hash, a leitura ou a interpretação do CSV | Separar erros de acesso, hash, formato e extração; exibir relatório por arquivo |
 | **Média** | Interface contém ações e módulos ainda sem comportamento | Pode induzir o usuário a esperar funcionalidades inexistentes | Ocultar/desabilitar ações não entregues e mostrar claramente “em desenvolvimento” |
-| **Média** | Migrações SQLite versionadas e rotina de backup ainda não aparecem no núcleo | Mudanças futuras de schema e recuperação de dados ficam frágeis | Adotar tabela `schema_migrations`, migrações incrementais e backup consistente via API/rotina SQLite |
+| **Média — parcial** | Migrações SQLite ainda não estão versionadas; backup/restauração foram adicionados | Mudanças futuras de schema podem ficar frágeis, embora exista recuperação do banco | Adotar tabela `schema_migrations` e validar rotina de backup/restauração em cenários reais |
 | **Média** | Testes automatizados não cobrem Rust/CSV/integração/UI | Regressões podem chegar ao usuário | Criar testes unitários Rust, fixtures CSV reais anonimizadas, testes de migração e smoke test do instalador |
 | **Média** | Dependências e formatos CAD/BIM ainda não passaram por validação de licença/versão | Risco de custo, incompatibilidade ou restrição de distribuição | Fazer prova de conceito isolada para cada formato e registrar matriz de compatibilidade/licenças |
 
