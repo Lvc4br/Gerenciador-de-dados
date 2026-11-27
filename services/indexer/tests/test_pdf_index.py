@@ -19,12 +19,12 @@ def test_extracted_pdf_text_is_searchable_and_updates_fts(tmp_path):
         )
         result = connection.execute(
             "SELECT rowid FROM document_text_fts WHERE document_text_fts MATCH ?",
-            ("EST-001",),
+            ('"EST-001"',),
         ).fetchone()
         assert result is not None
         connection.execute("UPDATE extracted_document_text SET content=? WHERE file_id=?", ("Memorial descritivo rodovia",file_id))
         assert connection.execute(
-            "SELECT rowid FROM document_text_fts WHERE document_text_fts MATCH ?", ("EST-001",)
+            "SELECT rowid FROM document_text_fts WHERE document_text_fts MATCH ?", ('"EST-001"',)
         ).fetchone() is None
         assert connection.execute(
             "SELECT rowid FROM document_text_fts WHERE document_text_fts MATCH ?", ("rodovia",)
