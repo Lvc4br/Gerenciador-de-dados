@@ -37,6 +37,14 @@
 
 **Especificação:** [PROJECT_CATALOG.md](PROJECT_CATALOG.md).
 
+### Etapa inicial — sugestões pelo nome do arquivo
+
+- Implementado parser conservador de prefixo de projeto, disciplina, número de desenho e revisão.
+- Resultados identificados como sugestões com indicador de confiança e origem `filename`.
+- Comando local de diagnóstico: `ged-indexer analyze-name "AB20A-EST-001_REV02.dwg"`.
+- Nenhum arquivo é aberto, renomeado, movido ou alterado por essa análise.
+- A confirmação humana e a comparação com dados do carimbo continuam obrigatórias.
+
 ## Fase 2 — Engenharia e divergências
 
 - Parser CSV AB20A (UTF-8 BOM e delimitador ponto e vírgula).
