@@ -119,3 +119,17 @@
 .review-metadata b { overflow-wrap: anywhere; font-size: 14px; }
 .review-actions { justify-content: flex-end; margin-top: 16px; }
 @media (max-width: 900px) { .review-metadata { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+
+/* Ações agrupadas no cabeçalho do Explorador */
+.heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sort-button.active {
+  border-color: var(--accent, #527a68);
+  background: var(--surface-raised, #edf4ef);
+}
