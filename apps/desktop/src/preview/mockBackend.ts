@@ -15,7 +15,7 @@ let sampleProjects = [
 ];
 let nextProjectId = 2;
 const sampleRoots = [{ id: 1, path: 'C:\\\\Projetos\\\\AB20A', added_at: '2026-10-01' }];
-let sampleProjectRootLinks: Record<number, number[]> = { 1: [1] };
+let sampleProjectRootLinks: Record<number, number[]> = { 1: [1] };\nlet sampleDisciplines: Array<{id:number;project_id:number;code:string;name:string;sort_order:number}> = [\n  { id: 1, project_id: 1, code: 'EST', name: 'Estruturas', sort_order: 0 },\n  { id: 2, project_id: 1, code: 'DRE', name: 'Drenagem', sort_order: 1 }\n];\nlet nextDisciplineId = 3;\nlet sampleProjectFileLinks: Record<string, number | null> = { '1:1': 1, '1:5': 2 };
 
 const sampleDiscrepancies = [
   { id: 1, filename: "AB20A-EST-001.dwg", branch: "Estruturas", number_in_filename: "EST-001", number_in_titleblock: "EST-010", revision: "02", extracted_title: "Planta de formas - tabuleiro", title_for_titleblock_number: "Detalhe de encontro", diagnosis: "Número divergente", artesp_number: "ART-001", internal_number: "EST-001", source_row: 2, source_csv: "divergencias_numero_carimbo.csv" },
@@ -58,6 +58,47 @@ export async function previewInvoke<T>(command: string, args: Record<string, unk
     case "archive_project": {
       const id = Number(args.id), status = args.archived ? "archived" : "active";
       sampleProjects = sampleProjects.map(p => p.id === id ? { ...p, status } : p);
+      result = null;
+      break;
+    }
+    case "list_project_disciplines": {
+      result = sampleDisciplines.filter(d => d.project_id === Number(args.projectId)).sort((a,b) => a.sort_order-b.sort_order);
+      break;
+    }
+    case "save_project_discipline": {
+      const projectId = Number(args.projectId), code = String(args.code ?? "").trim().toUpperCase(), name = String(args.name ?? "").trim();
+      if (!code || !name) throw new Error("Código e nome da disciplina são obrigatórios.");
+      if (sampleDisciplines.some(d => d.project_id === projectId && d.code.toUpperCase() === code)) throw new Error("Já existe uma disciplina com esse código neste projeto.");
+      const id = nextDisciplineId++;
+      sampleDisciplines = [...sampleDisciplines, { id, project_id: projectId, code, name, sort_order: Number(args.sortOrder ?? 0) }];
+      result = id;
+      break;
+    }
+    case "delete_project_discipline": {
+      const projectId = Number(args.projectId), disciplineId = Number(args.disciplineId);
+      sampleDisciplines = sampleDisciplines.filter(d => !(d.project_id === projectId && d.id === disciplineId));
+      for (const key of Object.keys(sampleProjectFileLinks)) if (key.startsWith(projectId + ":") && sampleProjectFileLinks[key] === disciplineId) sampleProjectFileLinks[key] = null;
+      result = null;
+      break;
+    }
+    case "list_project_files": {
+      const projectId = Number(args.projectId), search = String(args.search ?? "").toLocaleLowerCase("pt-BR");
+      const linkedRoots = sampleProjectRootLinks[projectId] ?? [];
+      const filtered = sampleFiles.filter(file =>
+        (linkedRoots.includes(1) || sampleProjectFileLinks[projectId + ":" + file.id] !== undefined) &&
+        (!search || file.filename.toLocaleLowerCase("pt-BR").includes(search) || file.relative_path.toLocaleLowerCase("pt-BR").includes(search))
+      ).map(file => {
+        const disciplineId = sampleProjectFileLinks[projectId + ":" + file.id] ?? null;
+        const discipline = sampleDisciplines.find(d => d.id === disciplineId && d.project_id === projectId);
+        return { ...file, linked: disciplineId !== null, discipline_id: disciplineId, discipline_code: discipline?.code ?? null, discipline_name: discipline?.name ?? null };
+      });
+      result = { items: filtered.slice(Number(args.offset ?? 0), Number(args.offset ?? 0) + Number(args.limit ?? 100)), total: filtered.length };
+      break;
+    }
+    case "set_project_file_link": {
+      const projectId = Number(args.projectId), fileId = Number(args.fileId), disciplineId = args.disciplineId == null ? null : Number(args.disciplineId);
+      if (disciplineId !== null && !sampleDisciplines.some(d => d.id === disciplineId && d.project_id === projectId)) throw new Error("A disciplina selecionada não pertence ao projeto.");
+      sampleProjectFileLinks[projectId + ":" + fileId] = disciplineId;
       result = null;
       break;
     }
