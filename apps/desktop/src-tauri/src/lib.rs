@@ -790,6 +790,37 @@ fn extract_pdf_text_blocking(app: tauri::AppHandle, file_id: i64) -> Result<serd
         params![file_id, expected_hash, content, character_count as i64, page_count as i64,
                 pages_with_text as i64, drawing_number, revision, candidate_title, metadata_confidence]
     ).map_err(|e| format!("Não foi possível salvar o texto extraído: {e}"))?;
+
+    if drawing_number.is_some() || revision.is_some() || candidate_title.is_some() {
+        let has_filename_suggestion: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM filename_suggestions WHERE file_id=?1 AND parser_version='1')",
+            params![file_id], |row| row.get(0)
+        ).map_err(|e| e.to_string())?;
+        if !has_filename_suggestion {
+            let discipline = drawing_number.as_deref().and_then(|value| value.split('-').next());
+            connection.execute(
+                "INSERT INTO filename_suggestions(
+                   file_id,discipline_code,drawing_number,revision,confidence,source,parser_version
+                 ) VALUES (?1,?2,?3,?4,?5,'pdf_content','pdf-content-1')
+                 ON CONFLICT(file_id,parser_version) DO UPDATE SET
+                   discipline_code=excluded.discipline_code,drawing_number=excluded.drawing_number,
+                   revision=excluded.revision,confidence=excluded.confidence,
+                   status=CASE
+                     WHEN filename_suggestions.discipline_code IS excluded.discipline_code
+                      AND filename_suggestions.drawing_number IS excluded.drawing_number
+                      AND filename_suggestions.revision IS excluded.revision
+                      AND filename_suggestions.confidence=excluded.confidence
+                     THEN filename_suggestions.status ELSE 'pending' END,
+                   reviewed_at=CASE
+                     WHEN filename_suggestions.discipline_code IS excluded.discipline_code
+                      AND filename_suggestions.drawing_number IS excluded.drawing_number
+                      AND filename_suggestions.revision IS excluded.revision
+                      AND filename_suggestions.confidence=excluded.confidence
+                     THEN filename_suggestions.reviewed_at ELSE NULL END",
+                params![file_id, discipline, drawing_number, revision, metadata_confidence]
+            ).map_err(|e| format!("Não foi possível registrar a sugestão extraída do PDF: {e}"))?;
+        }
+    }
     Ok(serde_json::json!({
         "file_id": file_id,
         "character_count": character_count,
