@@ -100,3 +100,9 @@
 @media (max-width: 760px) {
   .project-document-list .detail-row { grid-template-columns: 1fr; }
 }
+
+.project-link-box { display: grid; gap: 8px; margin: 14px 0; padding: 12px; border: 1px solid #e5eaf1; border-radius: 8px; background: #f9fbfd; }
+.project-link-box > b { color: #425168; font-size: 11px; }
+.project-link-box select { width: 100%; min-width: 0; height: 34px; border: 1px solid #e3e9f0; border-radius: 6px; background: #fff; color: #52647b; padding: 0 8px; font-size: 10px; }
+.project-link-box .secondary-button { justify-content: center; }
+.project-link-box small { color: #68866f; font-size: 9px; line-height: 1.4; overflow-wrap: anywhere; }
