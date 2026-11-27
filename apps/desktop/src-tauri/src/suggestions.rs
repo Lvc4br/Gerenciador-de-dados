@@ -187,6 +187,14 @@ pub fn apply_accepted(connection: &Connection, id: i64) -> Result<(), String> {
     if values.5 != "accepted" {
         return Err("Somente sugestões aceitas podem ser aplicadas.".into());
     }
+    let already_applied: bool = transaction.query_row(
+        "SELECT EXISTS(SELECT 1 FROM confirmed_document_metadata WHERE source_suggestion_id=?1)",
+        params![id], |row| row.get(0)
+    ).map_err(|e| e.to_string())?;
+    if already_applied {
+        transaction.commit().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
     let old: Option<String> = transaction.query_row(
         "SELECT json_object(
            'project_prefix',project_prefix,'discipline_code',discipline_code,
