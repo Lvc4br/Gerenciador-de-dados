@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { isPreviewMode, previewInvoke } from "./preview/mockBackend";
 import { listen } from "@tauri-apps/api/event";
@@ -270,7 +270,7 @@ function ProjectsPanel() {
     try { setRoots(await invoke<ProjectRoot[]>("list_project_roots", { projectId: project.id })); }
     catch (reason) { setRoots([]); setError(String(reason)); }
   }
-  async function createProject(event: React.FormEvent) {
+  async function createProject(event: FormEvent) {
     event.preventDefault(); setError(""); setNotice("");
     try {
       await invoke<number>("create_project", { code, name, client, description });
