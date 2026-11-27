@@ -21,7 +21,7 @@ export async function previewInvoke<T>(command: string, args: Record<string, unk
   let result: unknown;
   switch (command) {
     case "get_dashboard_stats":
-      result = { root_count: 3, file_count: 1342, duplicate_hash_groups: 8, drawing_metadata_count: 1336, discrepancy_count: 9 };
+      result = { root_count: 3, file_count: 1342, duplicate_hash_groups: 8, drawing_metadata_count: 1336, discrepancy_count: sampleDiscrepancies.length };
       break;
     case "list_files": {
       const search = String(args.search ?? "").toLocaleLowerCase("pt-BR");
