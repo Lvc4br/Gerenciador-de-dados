@@ -57,9 +57,9 @@ Na continuação da Fase 0, foram adicionadas à branch:
 - Estados de arquivo `indexed`, `skipped`, `error` e `missing` expostos no Explorador.
 - Varredura movida para `spawn_blocking`, evitando executar o hash pesado na thread de UI.
 - Contadores do dashboard e grupos de duplicidade consideram somente arquivos atualmente indexados.
-- Reimportação CSV remove linhas antigas excedentes e limpa os dados do tipo anterior quando o esquema da fonte muda.
+- Reimportação CSV remove linhas antigas excedentes, limpa os dados do tipo anterior quando o esquema da fonte muda e usa savepoint para rollback integral em falhas.
 
-**Limitações ainda abertas:** não há barra de progresso nem cancelamento; a importação CSV ainda precisa de uma estratégia de savepoint para garantir rollback integral se ocorrer erro de escrita no meio do lote; histórico imutável de conteúdo ainda não foi criado. Essas correções também aguardam confirmação do CI Windows.
+**Limitações ainda abertas:** não há barra de progresso nem cancelamento; histórico imutável de conteúdo ainda não foi criado. Essas correções também aguardam confirmação do CI Windows.
 
 ## 4. Achados da auditoria — prioridade
 
