@@ -28,6 +28,8 @@ npm run preview
 
 4. Abra no navegador o endereço indicado pelo Vite (por padrão, `http://localhost:1420`).
 
+Atalho: com a pasta raiz aberta no VS Code, use **Terminal → Executar Tarefa... → GED: prévia visual**. O arquivo `.vscode/tasks.json` também oferece a tarefa **GED: aplicativo desktop (Tauri)** quando as ferramentas nativas estiverem instaladas.
+
 Na prévia, é possível navegar pela Visão geral, Explorador e Divergências, testar pesquisa, filtros, ordenação e paginação. Os botões de importação, backup e restauração explicam que essas operações exigem o aplicativo desktop. Os dados exibidos são fictícios e não devem ser usados como registros de engenharia.
 
 ## Executar o aplicativo desktop real em desenvolvimento
