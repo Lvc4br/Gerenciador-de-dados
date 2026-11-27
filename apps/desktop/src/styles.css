@@ -106,3 +106,16 @@
 .project-link-box select { width: 100%; min-width: 0; height: 34px; border: 1px solid #e3e9f0; border-radius: 6px; background: #fff; color: #52647b; padding: 0 8px; font-size: 10px; }
 .project-link-box .secondary-button { justify-content: center; }
 .project-link-box small { color: #68866f; font-size: 9px; line-height: 1.4; overflow-wrap: anywhere; }
+
+
+.review-item { padding: 18px 20px; border-bottom: 1px solid var(--border, #e5e7eb); }
+.review-item:last-child { border-bottom: 0; }
+.review-item-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.review-item-heading > div { min-width: 0; display: grid; gap: 4px; }
+.review-item-heading b { overflow-wrap: anywhere; }
+.review-item-heading small, .review-metadata small { color: var(--muted, #64748b); font-size: 12px; }
+.review-metadata { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+.review-metadata > div { display: grid; gap: 5px; min-width: 0; }
+.review-metadata b { overflow-wrap: anywhere; font-size: 14px; }
+.review-actions { justify-content: flex-end; margin-top: 16px; }
+@media (max-width: 900px) { .review-metadata { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
