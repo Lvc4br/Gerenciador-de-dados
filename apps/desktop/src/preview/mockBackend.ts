@@ -187,7 +187,7 @@ export async function previewInvoke<T>(command: string, args: Record<string, unk
       const file = sampleFiles.find(item => item.id === fileId);
       if (!file || file.extension !== "pdf") throw new Error("Selecione um PDF válido.");
       samplePdfText[fileId] = "Projeto AB20A. Desenho EST-001. Revisão 02. Planta de formas do tabuleiro e estrutura de concreto.";
-      result = { file_id: fileId, character_count: samplePdfText[fileId].length, needs_ocr: false, parser_version: "preview-mock" };
+      result = { file_id: fileId, character_count: samplePdfText[fileId].length, page_count: 2, pages_with_text: 2, needs_ocr: false, parser_version: "preview-mock" };
       break;
     }
     case "extract_pending_pdf_text": {
