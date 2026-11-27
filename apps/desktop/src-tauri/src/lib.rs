@@ -15,6 +15,8 @@ struct ScanSummary {
     indexed: u64,
     skipped: u64,
     errors: u64,
+    missing: u64,
+    reconciliation_complete: bool,
     duplicate_hash_groups: u64,
 }
 
@@ -189,12 +191,19 @@ fn scan_folder(app: tauri::AppHandle, folder: String) -> Result<ScanSummary, Str
         params![if traversal_errors == 0 { "completed" } else { "partial" }, scan_id]
     ).map_err(|e| e.to_string())?;
 
+    let missing: u64 = connection.query_row(
+        "SELECT COUNT(*) FROM files WHERE root_id=?1 AND status='missing'",
+        params![root_id], |row| row.get(0)
+    ).map_err(|e| e.to_string())?;
     let duplicate_hash_groups: u64 = connection.query_row(
-        "SELECT COUNT(*) FROM (SELECT sha256 FROM files GROUP BY sha256 HAVING COUNT(*) > 1)",
+        "SELECT COUNT(*) FROM (SELECT sha256 FROM files WHERE status='indexed' GROUP BY sha256 HAVING COUNT(*) > 1)",
         [], |row| row.get(0)
     ).map_err(|e| e.to_string())?;
 
-    Ok(ScanSummary { root: root.to_string_lossy().to_string(), indexed, skipped, errors, duplicate_hash_groups })
+    Ok(ScanSummary {
+        root: root.to_string_lossy().to_string(), indexed, skipped, errors,
+        missing, reconciliation_complete: traversal_errors == 0, duplicate_hash_groups
+    })
 }
 
 #[tauri::command]
@@ -222,6 +231,7 @@ struct FileRecord {
     modified_at: String,
     sha256: String,
     root_path: String,
+    status: String,
 }
 
 #[derive(Serialize)]
@@ -264,7 +274,7 @@ fn list_files(
     let direction = if ascending.unwrap_or(true) { "ASC" } else { "DESC" };
     let sql = format!(
         "SELECT f.id, f.filename, f.relative_path, f.extension, f.byte_size,
-                f.modified_at, f.sha256, r.path
+                f.modified_at, f.sha256, r.path, f.status
          FROM files f JOIN scan_roots r ON r.id = f.root_id
          WHERE (?1 = '' OR f.filename LIKE ?2 ESCAPE '\\' OR f.relative_path LIKE ?2 ESCAPE '\\')
            AND (?3 IS NULL OR lower(f.extension) = ?3)
@@ -283,6 +293,7 @@ fn list_files(
             modified_at: row.get(5)?,
             sha256: row.get(6)?,
             root_path: row.get(7)?,
+            status: row.get(8)?,
         })
     ).map_err(|e| e.to_string())?;
     let mut items = Vec::new();
