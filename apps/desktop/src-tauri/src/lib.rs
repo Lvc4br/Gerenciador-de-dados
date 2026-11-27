@@ -1241,6 +1241,9 @@ mod backup_tests {
         assert_eq!(revision, None);
         assert_eq!(title, None);
         assert_eq!(confidence, 0.0);
+        let (road_number, _, _, _) =
+            extract_pdf_metadata_candidates("Rodovia BR-101").expect("parse highway text");
+        assert_eq!(road_number, None);
     }
 
     #[test]
