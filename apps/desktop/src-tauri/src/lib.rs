@@ -1,9 +1,9 @@
 mod csv_metadata;
 
-use rusqlite::{params, Connection};
+use rusqlite::{backup::Backup, params, Connection, OpenFlags};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use std::{fs::File, io::Read, path::{Path, PathBuf}};
+use std::{fs::File, io::Read, path::{Path, PathBuf}, time::{Duration, SystemTime, UNIX_EPOCH}};
 use tauri::{Emitter, Manager};
 use walkdir::WalkDir;
 
@@ -252,6 +252,92 @@ async fn scan_folder(app: tauri::AppHandle, folder: String) -> Result<ScanSummar
         .map_err(|error| error.to_string())?
 }
 
+
+fn validate_backup_database(path: &Path) -> Result<Connection, String> {
+    if !path.is_file() {
+        return Err("O arquivo de backup selecionado não existe.".into());
+    }
+    let connection = Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX
+    ).map_err(|e| format!("Não foi possível abrir o backup: {e}"))?;
+    let integrity: String = connection.query_row("PRAGMA integrity_check", [], |row| row.get(0))
+        .map_err(|e| format!("Falha ao verificar a integridade do backup: {e}"))?;
+    if integrity != "ok" {
+        return Err(format!("Backup inválido: {integrity}"));
+    }
+    let has_files: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('scan_roots','files','file_versions')",
+        [], |row| row.get(0)
+    ).map_err(|e| format!("O arquivo não parece ser um banco GED: {e}"))?;
+    if has_files != 3 {
+        return Err("O arquivo selecionado não contém o esquema esperado do GED.".into());
+    }
+    Ok(connection)
+}
+
+fn copy_database(source: &Connection, destination: &mut Connection) -> Result<(), String> {
+    let backup = Backup::new(source, destination).map_err(|e| e.to_string())?;
+    backup.run_to_completion(5, Duration::from_millis(100), None)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn create_database_backup(app: tauri::AppHandle, destination_path: String) -> Result<String, String> {
+    let destination_path = PathBuf::from(destination_path);
+    if destination_path.extension().and_then(|value| value.to_str()).unwrap_or("").is_empty() {
+        return Err("Escolha um nome de arquivo com extensão .sqlite3.".into());
+    }
+    let source_path = database_path(&app)?;
+    if destination_path.exists() && destination_path.canonicalize().ok() == source_path.canonicalize().ok() {
+        return Err("O backup não pode sobrescrever o banco de dados em uso.".into());
+    }
+    if let Some(parent) = destination_path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let source = open_database(&app)?;
+    let mut destination = Connection::open(&destination_path).map_err(|e| e.to_string())?;
+    copy_database(&source, &mut destination)?;
+    let integrity: String = destination.query_row("PRAGMA integrity_check", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+    if integrity != "ok" {
+        return Err(format!("O backup foi criado, mas a verificação falhou: {integrity}"));
+    }
+    Ok(destination_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn restore_database_backup(app: tauri::AppHandle, source_path: String) -> Result<String, String> {
+    let source_path = PathBuf::from(source_path).canonicalize().map_err(|e| e.to_string())?;
+    let current_path = database_path(&app)?;
+    if source_path == current_path.canonicalize().unwrap_or(current_path.clone()) {
+        return Err("Selecione um arquivo de backup, não o banco de dados em uso.".into());
+    }
+    let source = validate_backup_database(&source_path)?;
+
+    // Preserve the current database before replacing it. The safety copy is stored
+    // inside the GED application data directory and can be used for manual recovery.
+    let backup_dir = app.path().app_data_dir().map_err(|e| e.to_string())?.join("backups");
+    std::fs::create_dir_all(&backup_dir).map_err(|e| e.to_string())?;
+    let stamp = SystemTime::now().duration_since(UNIX_EPOCH)
+        .map_err(|e| e.to_string())?.as_secs();
+    let safety_path = backup_dir.join(format!("ged-pre-restore-{stamp}.sqlite3"));
+    let current = open_database(&app)?;
+    let mut safety_copy = Connection::open(&safety_path).map_err(|e| e.to_string())?;
+    copy_database(&current, &mut safety_copy)?;
+    drop(safety_copy);
+    drop(current);
+
+    let mut destination = open_database(&app)?;
+    copy_database(&source, &mut destination)?;
+    let integrity: String = destination.query_row("PRAGMA integrity_check", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+    if integrity != "ok" {
+        return Err(format!("A restauração foi aplicada, mas a verificação falhou: {integrity}. Cópia de segurança anterior: {}", safety_path.display()));
+    }
+    Ok(safety_path.to_string_lossy().to_string())
+}
+
 #[tauri::command]
 fn get_dashboard_stats(app: tauri::AppHandle) -> Result<DashboardStats, String> {
     let connection = open_database(&app)?;
@@ -463,7 +549,7 @@ fn list_discrepancies(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![scan_folder, get_dashboard_stats, list_files, list_file_versions, list_discrepancies])
+        .invoke_handler(tauri::generate_handler![scan_folder, get_dashboard_stats, create_database_backup, restore_database_backup, list_files, list_file_versions, list_discrepancies])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar o GED Desktop");
 }
