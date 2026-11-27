@@ -1,5 +1,6 @@
 mod csv_metadata;
 mod projects;
+mod suggestions;
 
 use rusqlite::{backup::Backup, params, Connection, OpenFlags};
 use serde::Serialize;
@@ -141,6 +142,7 @@ fn open_database(app: &tauri::AppHandle) -> Result<Connection, String> {
     csv_metadata::ensure_schema(&connection)?;
     projects::ensure_schema(&connection)?;
     projects::ensure_relations_schema(&connection)?;
+    suggestions::ensure_schema(&connection)?;
     Ok(connection)
 }
 
@@ -285,6 +287,7 @@ fn scan_folder_blocking(app: tauri::AppHandle, folder: String) -> Result<ScanSum
                  VALUES (?1,?2,?3,?4)",
                 params![file_id, hash, metadata.len() as i64, modified]
             ).map_err(|e| e.to_string())?;
+            suggestions::analyze_and_store(&transaction, file_id, &filename)?;
             indexed += 1;
             if extension == "csv" {
                 match transaction.query_row(
@@ -711,6 +714,27 @@ fn list_discrepancies(
 
 
 #[tauri::command]
+fn list_filename_suggestions(
+    app: tauri::AppHandle, status: Option<String>, search: Option<String>,
+    limit: Option<u32>, offset: Option<u32>,
+) -> Result<serde_json::Value, String> {
+    let connection = open_database(&app)?;
+    let (items, total) = suggestions::list(
+        &connection, status.as_deref().unwrap_or("pending"), search.as_deref().unwrap_or(""),
+        limit.unwrap_or(100), offset.unwrap_or(0)
+    )?;
+    Ok(serde_json::json!({ "items": items, "total": total }))
+}
+
+#[tauri::command]
+fn review_filename_suggestion(
+    app: tauri::AppHandle, id: i64, decision: String,
+) -> Result<(), String> {
+    let connection = open_database(&app)?;
+    suggestions::review(&connection, id, &decision)
+}
+
+#[tauri::command]
 fn list_projects(
     app: tauri::AppHandle,
     search: Option<String>,
@@ -810,7 +834,7 @@ fn set_project_file_link(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![scan_folder, get_dashboard_stats, create_database_backup, restore_database_backup, list_files, list_file_versions, list_discrepancies, list_projects, create_project, update_project, archive_project, list_project_roots, set_project_root_link, list_project_disciplines, save_project_discipline, delete_project_discipline, list_project_files, set_project_file_link])
+        .invoke_handler(tauri::generate_handler![scan_folder, get_dashboard_stats, create_database_backup, restore_database_backup, list_files, list_file_versions, list_discrepancies, list_filename_suggestions, review_filename_suggestion, list_projects, create_project, update_project, archive_project, list_project_roots, set_project_root_link, list_project_disciplines, save_project_discipline, delete_project_discipline, list_project_files, set_project_file_link])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar o GED Desktop");
 }
