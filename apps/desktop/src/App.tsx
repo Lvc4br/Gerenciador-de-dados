@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 
 type Section = "Visão geral" | "Projetos" | "Explorador" | "Divergências" | "Exportações";
-type DashboardStats = { root_count: number; file_count: number; duplicate_hash_groups: number };
+type DashboardStats = { root_count: number; file_count: number; duplicate_hash_groups: number; drawing_metadata_count: number; discrepancy_count: number };
 type ScanSummary = { root: string; indexed: number; skipped: number; errors: number; duplicate_hash_groups: number };
 
 const navigation: { label: Section; icon: typeof LayoutDashboard }[] = [
@@ -20,7 +20,7 @@ const navigation: { label: Section; icon: typeof LayoutDashboard }[] = [
   { label: "Exportações", icon: ArrowDownToLine }
 ];
 
-const emptyStats: DashboardStats = { root_count: 0, file_count: 0, duplicate_hash_groups: 0 };
+const emptyStats: DashboardStats = { root_count: 0, file_count: 0, duplicate_hash_groups: 0, drawing_metadata_count: 0, discrepancy_count: 0 };
 
 
 type FileRecord = {
@@ -204,7 +204,8 @@ function App() {
                 <article className="stat-card"><div className="stat-icon blue"><Folder size={19} /></div><span>Pastas indexadas</span><strong>{stats.root_count}</strong><small>Diretórios adicionados à biblioteca</small></article>
                 <article className="stat-card"><div className="stat-icon violet"><Files size={19} /></div><span>Documentos indexados</span><strong>{stats.file_count.toLocaleString("pt-BR")}</strong><small>Arquivos registrados no banco local</small></article>
                 <article className="stat-card"><div className="stat-icon amber"><CircleAlert size={19} /></div><span>Grupos com hash duplicado</span><strong>{stats.duplicate_hash_groups}</strong><small>Conteúdos idênticos; revisar antes de excluir</small></article>
-                <article className="stat-card"><div className="stat-icon green"><ShieldCheck size={19} /></div><span>Integridade</span><strong>SHA-256</strong><small>Hash calculado durante a indexação</small></article>
+                <article className="stat-card"><div className="stat-icon green"><FileCheck2 size={19} /></div><span>Registros de carimbo</span><strong>{stats.drawing_metadata_count.toLocaleString("pt-BR")}</strong><small>Metadados importados de CSV reconhecido</small></article>
+                <article className="stat-card"><div className="stat-icon amber"><CircleAlert size={19} /></div><span>Divergências importadas</span><strong>{stats.discrepancy_count.toLocaleString("pt-BR")}</strong><small>Registros de diagnóstico presentes nos CSVs</small></article>
               </div>
 
               <div className="lower-grid">
