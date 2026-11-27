@@ -117,3 +117,16 @@ A aceitação atual registra a decisão, mas não promove os campos para os meta
 - A aplicação não cria vínculo de projeto, não altera o arquivo original e não substitui os dados importados dos CSVs.
 
 A listagem de sugestões também consulta `drawing_metadata` por nome de arquivo e devolve `titleblock_internal_number`, `titleblock_artesp_number` e `titleblock_title` para conferência lado a lado. Quando não há correspondência importada, esses campos são nulos; isso não é tratado como divergência confirmada.
+
+
+## Extração inicial de PDF (motor Python/CLI)
+
+O módulo `ged_indexer.pdf.extract_pdf_text(path)` extrai texto incorporado em PDFs usando `pypdf`, sem rede e sem modificar o documento. A dependência é opcional (`pip install -e '.[pdf]'`); está incluída no extra de testes do CI.
+
+Limites de proteção: 200 MB por arquivo, 5.000 páginas e 10 milhões de caracteres extraídos. PDFs criptografados sem senha são recusados. O extrator não executa OCR: arquivos digitalizados sem camada textual podem retornar texto vazio.
+
+Comandos:
+- `ged-indexer extract-pdf <file_id>`: localiza um PDF previamente catalogado, confere o SHA-256 atual contra a última varredura, extrai e salva o texto em `extracted_document_text`.
+- `ged-indexer search-content "<termos>" --limit 50`: pesquisa o texto indexado pelo FTS5 e devolve caminho e trecho de contexto.
+
+A tabela `document_text_fts` é mantida por triggers quando o conteúdo extraído é inserido, atualizado ou removido. O texto é separado dos arquivos originais. Este fluxo ainda pertence ao banco do motor Python; a integração com o banco SQLite Rust/Tauri e com a busca na interface desktop é trabalho pendente, não devendo ser confundida com uma função já disponível no executável.
