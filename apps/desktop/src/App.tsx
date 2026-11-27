@@ -29,7 +29,7 @@ const emptyStats: DashboardStats = { root_count: 0, file_count: 0, duplicate_has
 
 type FileRecord = {
   id: number; filename: string; relative_path: string; extension: string;
-  byte_size: number; modified_at: string; sha256: string; root_path: string; status: string;
+  byte_size: number; modified_at: string; sha256: string; root_path: string; status: string; content_snippet?: string | null;
 };
 type FilePage = { items: FileRecord[]; total: number };
 type FileVersion = { id: number; sha256: string; byte_size: number; modified_at: string; captured_at: string };
@@ -181,7 +181,7 @@ function ExplorerPanel() {
             <thead><tr><th>Nome</th><th>Tipo</th><th>Tamanho</th><th>Última modificação</th><th>Status</th></tr></thead>
             <tbody>
               {data.items.map(file => <tr key={file.id} className={selected?.id === file.id ? 'selected' : ''} onClick={() => setSelected(file)}>
-                <td><div className="file-name"><FileText size={16} /><div><b>{file.filename}</b><small>{file.relative_path}</small></div></div></td>
+                <td><div className="file-name"><FileText size={16} /><div><b>{file.filename}</b><small>{file.relative_path}</small>{file.content_snippet && <small className="content-snippet">Trecho do PDF: {file.content_snippet}</small>}</div></div></td>
                 <td><span className="file-ext">{file.extension ? file.extension.toUpperCase() : 'SEM TIPO'}</span></td>
                 <td>{formatBytes(file.byte_size)}</td>
                 <td>{formatDate(file.modified_at)}</td>
