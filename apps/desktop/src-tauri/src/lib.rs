@@ -1,4 +1,5 @@
 mod csv_metadata;
+mod projects;
 
 use rusqlite::{backup::Backup, params, Connection, OpenFlags};
 use serde::Serialize;
@@ -138,6 +139,7 @@ fn open_database(app: &tauri::AppHandle) -> Result<Connection, String> {
 
     apply_fts_migration(&connection)?;
     csv_metadata::ensure_schema(&connection)?;
+    projects::ensure_schema(&connection)?;
     Ok(connection)
 }
 
@@ -669,11 +671,64 @@ fn list_discrepancies(
     Ok(DiscrepancyPage { items, total })
 }
 
+
+#[tauri::command]
+fn list_projects(
+    app: tauri::AppHandle,
+    search: Option<String>,
+    status: Option<String>,
+    limit: Option<u32>,
+    offset: Option<u32>,
+) -> Result<serde_json::Value, String> {
+    let connection = open_database(&app)?;
+    let (items, total) = projects::list(
+        &connection, search.as_deref().unwrap_or(""), status.as_deref().unwrap_or(""),
+        limit.unwrap_or(100), offset.unwrap_or(0)
+    )?;
+    serde_json::to_value(serde_json::json!({ "items": items, "total": total })).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn create_project(
+    app: tauri::AppHandle, code: String, name: String,
+    client: Option<String>, description: Option<String>,
+) -> Result<i64, String> {
+    let connection = open_database(&app)?;
+    projects::create(&connection, &code, &name, client.as_deref().unwrap_or(""), description.as_deref().unwrap_or(""))
+}
+
+#[tauri::command]
+fn update_project(
+    app: tauri::AppHandle, id: i64, code: String, name: String,
+    client: Option<String>, description: Option<String>,
+) -> Result<(), String> {
+    let connection = open_database(&app)?;
+    projects::update(&connection, id, &code, &name, client.as_deref().unwrap_or(""), description.as_deref().unwrap_or(""))
+}
+
+#[tauri::command]
+fn archive_project(app: tauri::AppHandle, id: i64, archived: bool) -> Result<(), String> {
+    let connection = open_database(&app)?;
+    projects::set_archived(&connection, id, archived)
+}
+
+#[tauri::command]
+fn list_project_roots(app: tauri::AppHandle, project_id: i64) -> Result<Vec<projects::ProjectRootRecord>, String> {
+    let connection = open_database(&app)?;
+    projects::list_roots(&connection, project_id)
+}
+
+#[tauri::command]
+fn set_project_root_link(app: tauri::AppHandle, project_id: i64, root_id: i64, linked: bool) -> Result<(), String> {
+    let connection = open_database(&app)?;
+    projects::link_root(&connection, project_id, root_id, linked)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![scan_folder, get_dashboard_stats, create_database_backup, restore_database_backup, list_files, list_file_versions, list_discrepancies])
+        .invoke_handler(tauri::generate_handler![scan_folder, get_dashboard_stats, create_database_backup, restore_database_backup, list_files, list_file_versions, list_discrepancies, list_projects, create_project, update_project, archive_project, list_project_roots, set_project_root_link])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar o GED Desktop");
 }
