@@ -1159,6 +1159,15 @@ mod backup_tests {
     use super::*;
 
     #[test]
+    fn fts_query_splits_hyphenated_drawing_identifiers() {
+        assert_eq!(
+            build_fts_query("EST-001"),
+            Some("\\"EST\\"* AND \\"001\\"*".to_string())
+        );
+        assert_eq!(build_fts_query("x"), None);
+    }
+
+    #[test]
     fn fts_migration_indexes_existing_and_future_files() {
         let connection = Connection::open_in_memory().expect("open database");
         connection.execute_batch(
