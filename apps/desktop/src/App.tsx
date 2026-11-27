@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import {
   Archive, ArrowDownToLine, Bell, BookOpen, ChevronRight,
   CircleAlert, Clock3, FileCheck2, FileSearch, Files, Folder, FolderOpen,
@@ -241,6 +241,43 @@ function App() {
 
   useEffect(() => { void refreshStats(); }, []);
 
+  async function createBackup() {
+    setError("");
+    const destination = await save({
+      title: "Salvar backup do GED",
+      defaultPath: "ged-backup.sqlite3",
+      filters: [{ name: "Banco SQLite GED", extensions: ["sqlite3", "db"] }]
+    });
+    if (typeof destination !== "string") return;
+    try {
+      const savedPath = await invoke<string>("create_database_backup", { destinationPath: destination });
+      setMessage(`Backup criado e verificado com sucesso: ${savedPath}`);
+    } catch (reason) {
+      setError(String(reason));
+      setMessage("");
+    }
+  }
+
+  async function restoreBackup() {
+    setError("");
+    const selected = await open({
+      title: "Selecionar backup para restauração",
+      directory: false,
+      multiple: false,
+      filters: [{ name: "Backup do GED", extensions: ["sqlite3", "db"] }]
+    });
+    if (typeof selected !== "string") return;
+    if (!window.confirm("A restauração substituirá os dados atuais do GED. Uma cópia de segurança automática do banco atual será criada antes. Deseja continuar?")) return;
+    try {
+      const safetyPath = await invoke<string>("restore_database_backup", { sourcePath: selected });
+      await refreshStats();
+      setMessage(`Restauração concluída. O banco anterior foi preservado em: ${safetyPath}`);
+    } catch (reason) {
+      setError(String(reason));
+      setMessage("");
+    }
+  }
+
   async function importFolder() {
     setError("");
     const selected = await open({ directory: true, multiple: false, title: "Selecionar pasta de projetos" });
@@ -303,7 +340,11 @@ function App() {
             <>
               <div className="page-heading">
                 <div><div className="eyebrow">CENTRAL DE CONTROLE</div><h1>Visão geral</h1><p>Encontre, organize e analise o conhecimento dos projetos da sua engenharia.</p></div>
-                <button className="primary-button" onClick={importFolder} disabled={scanning}><FolderOpen size={17} /> {scanning ? "Indexando..." : "Importar pasta"}</button>
+                <div className="dashboard-actions">
+                  <button className="secondary-button" onClick={() => void createBackup()} disabled={scanning}><Archive size={16} /> Backup</button>
+                  <button className="secondary-button" onClick={() => void restoreBackup()} disabled={scanning}><ShieldCheck size={16} /> Restaurar</button>
+                  <button className="primary-button" onClick={importFolder} disabled={scanning}><FolderOpen size={17} /> {scanning ? "Indexando..." : "Importar pasta"}</button>
+                </div>
               </div>
 
               {(message || error) && <div className={error ? "notice error" : "notice"} role="status">{error || message}</div>}
