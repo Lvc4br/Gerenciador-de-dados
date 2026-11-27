@@ -8,8 +8,10 @@ O GED é um **aplicativo desktop Windows**, instalado localmente e distribuído 
 
 - Tauri 2: shell desktop, janela, menus, permissões e empacotamento.
 - React + TypeScript: interface.
-- Python sidecar empacotado: extração, OCR, classificação, regras e adaptadores técnicos.
-- SQLite: catálogo, metadados, jobs, auditoria e índice FTS5.
+- Rust/Tauri: indexação local, hash, operações nativas, extração textual de PDF e comandos do catálogo.
+- SQLite: catálogo, metadados, auditoria e índices FTS5 de nome/caminho e conteúdo PDF.
+- Python: motor experimental separado para parsers e análises especializadas; ainda não empacotado nem conectado como sidecar do executável.
+- OCR e adaptadores Office/CAD/BIM: componentes futuros, sujeitos a provas técnicas e validação de licença.
 - Sistema de arquivos: originais e derivados locais.
 - Serviços externos opcionais: somente para sincronização, IA remota ou integrações explicitamente habilitadas.
 
@@ -22,14 +24,14 @@ flowchart TB
   U[Engenheiro] --> APP[GED Desktop Windows]
   APP --> UI[React + TypeScript]
   UI --> TAURI[Tauri / comandos nativos]
-  TAURI --> CORE[Python sidecar empacotado]
+  TAURI --> CORE[Rust commands e jobs locais]
   CORE --> DB[(SQLite + FTS5)]
   CORE --> FS[Pastas locais / rede autorizada]
-  CORE --> PARSERS[Adaptadores PDF, Office, CSV, CAD, BIM]
-  CORE --> RULES[Classificação e divergências]
-  CORE --> SEARCH[Busca e recomendação local]
-  CORE --> PREVIEW[Previews e miniaturas]
-  CORE --> EXPORT[Exportação e relatórios]
+  CORE --> PDF[Extração textual PDF]
+  CORE --> SEARCH[Busca de nome, caminho e texto PDF]
+  CORE -. futuro .-> PY[Python sidecar opcional]
+  PY --> OCR[OCR e parsers especializados]
+  PY --> CAD[Adaptadores Office, CAD e BIM]
   APP -. opcional e consentido .-> SYNC[Servidor corporativo futuro]
 ```
 
@@ -41,20 +43,10 @@ gerenciador-de-dados/
     desktop/                 # Tauri 2 + React + TypeScript
       src/                   # telas, componentes, estado
       src-tauri/             # Rust commands, permissões, bundler
-  engine/
-    ged_engine/              # Python sidecar
-      core/                  # configuração, logging, erros
-      catalog/               # projetos, documentos, versões
-      ingestion/             # varredura, importação, jobs
-      metadata/              # extração e proveniência
-      taxonomy/              # classificação
-      findings/              # regras e divergências
-      search/                # FTS e similaridade
-      preview/               # derivados seguros
-      export/                # exportadores e manifestos
-      adapters/              # csv, pdf, office, image, cad, ifc
-      db/                    # SQLite, modelos e migrações
-      tests/
+  services/
+    indexer/                 # Python experimental / CLI, ainda não integrado
+      src/ged_indexer/       # scanner, nomes e protótipo PDF
+      tests/                 # testes pytest
   installer/                 # ícones, configuração e scripts
   docs/
 ```
@@ -105,9 +97,7 @@ Para grandes volumes, evitar carregar arquivos inteiros na memória. Processar e
 
 ## 7. Comunicação entre interface e motor
 
-Preferir comandos Tauri para operações nativas pequenas e um canal IPC local restrito para jobs longos do Python sidecar. Se usar HTTP loopback, vincular somente a localhost, autenticar com token efêmero por execução, escolher porta dinâmica, validar origem e encerrar o processo ao fechar o aplicativo. Nunca expor uma API aberta na rede local por padrão.
-
-O sidecar deve iniciar e parar com o app, reportar saúde/versão e comunicar progresso por eventos. Falhas do motor não podem corromper o catálogo.
+O executável atual usa comandos Tauri e tarefas `spawn_blocking` para indexação e extração de PDF; o texto é persistido no SQLite do desktop. O Python indexer é experimental e não é iniciado pelo aplicativo. Se um sidecar for integrado no futuro, deverá usar IPC local restrito, reportar saúde/versão, suportar timeout/cancelamento e nunca expor uma API aberta na rede local.
 
 ## 8. Divergências
 
@@ -123,7 +113,7 @@ Divergência é alerta para revisão, não conclusão automática de erro ou nã
 
 ## 9. Busca e recomendação local
 
-- FTS5 para nome, título, conteúdo e identificadores.
+- FTS5 para nome/caminho e conteúdo textual de PDFs já extraídos; título e identificadores estruturados entram gradualmente.
 - Filtros estruturados: obra, rodovia, trecho, ramo, disciplina, tipo, etapa, revisão, data, escala e formato.
 - Similaridade lexical e técnica por atributos normalizados.
 - Embeddings locais opcionais, ativados conforme hardware e licença/modelo.
