@@ -47,7 +47,21 @@ O principal ajuste arquitetural recomendado é separar claramente as responsabil
 - Não há trilha de auditoria operacional completa.
 - Os testes Python cobrem o scanner, mas não cobrem o fluxo Tauri/Rust, importação CSV, banco SQLite desktop ou interface.
 
-## 3. Achados da auditoria — prioridade
+## 3. Correções iniciadas após a auditoria
+
+Na continuação da Fase 0, foram adicionadas à branch:
+- Registro de execuções de varredura em `scan_runs`.
+- Migração compatível para adicionar `last_seen_scan_id` em bancos já existentes.
+- Reconciliação de arquivos não encontrados: quando a travessia da pasta termina sem erro, os registros não vistos são marcados como `missing`, sem apagar seus dados.
+- Erros de travessia impedem a marcação global de ausentes, evitando falsos positivos em varreduras parciais.
+- Estados de arquivo `indexed`, `skipped`, `error` e `missing` expostos no Explorador.
+- Varredura movida para `spawn_blocking`, evitando executar o hash pesado na thread de UI.
+- Contadores do dashboard e grupos de duplicidade consideram somente arquivos atualmente indexados.
+- Reimportação CSV remove linhas antigas excedentes e limpa os dados do tipo anterior quando o esquema da fonte muda.
+
+**Limitações ainda abertas:** não há barra de progresso nem cancelamento; a importação CSV ainda precisa de uma estratégia de savepoint para garantir rollback integral se ocorrer erro de escrita no meio do lote; histórico imutável de conteúdo ainda não foi criado. Essas correções também aguardam confirmação do CI Windows.
+
+## 4. Achados da auditoria — prioridade
 
 | Prioridade | Achado | Risco / efeito | Recomendação |
 |---|---|---|---|
@@ -65,7 +79,7 @@ O principal ajuste arquitetural recomendado é separar claramente as responsabil
 | **Média** | Testes automatizados não cobrem Rust/CSV/integração/UI | Regressões podem chegar ao usuário | Criar testes unitários Rust, fixtures CSV reais anonimizadas, testes de migração e smoke test do instalador |
 | **Média** | Dependências e formatos CAD/BIM ainda não passaram por validação de licença/versão | Risco de custo, incompatibilidade ou restrição de distribuição | Fazer prova de conceito isolada para cada formato e registrar matriz de compatibilidade/licenças |
 
-## 4. Recomendação de linguagens e tecnologias
+## 5. Recomendação de linguagens e tecnologias
 
 | Camada | Recomendação | Motivo |
 |---|---|---|
@@ -88,7 +102,7 @@ O principal ajuste arquitetural recomendado é separar claramente as responsabil
 
 Não mover tudo para Python. O Rust já está integrado ao Tauri e é adequado para operações de sistema. Python deve entrar quando houver uma tarefa de extração ou análise que justifique seu ecossistema. O sidecar precisa ter protocolo IPC local restrito, versão/health check, timeout, cancelamento e limites de memória; não deve abrir uma API de rede acessível na LAN.
 
-## 5. Modelo de dados que recomendo consolidar
+## 6. Modelo de dados que recomendo consolidar
 
 Separar os conceitos abaixo:
 1. **Raiz de biblioteca:** pasta que o usuário autorizou o GED a catalogar.
@@ -102,7 +116,7 @@ Separar os conceitos abaixo:
 
 Não tratar hash igual como sinônimo de mesmo projeto. Hash igual significa conteúdo binário idêntico; semelhança de projeto deve usar atributos e evidências distintas.
 
-## 6. Regras de qualidade e segurança
+## 7. Regras de qualidade e segurança
 
 - Nunca modificar originais automaticamente.
 - Não executar macros, scripts ou conteúdo ativo de documentos.
@@ -116,7 +130,7 @@ Não tratar hash igual como sinônimo de mesmo projeto. Hash igual significa con
 - Não enviar documentos a serviços externos sem consentimento explícito.
 - Assinar o instalador antes de distribuição ampla e verificar atualizações de forma segura.
 
-## 7. Plano de execução recomendado
+## 8. Plano de execução recomendado
 
 ### Fase 0 — estabilização técnica
 - Validar build e execução no Windows 10/11 x64.
@@ -168,7 +182,7 @@ Não tratar hash igual como sinônimo de mesmo projeto. Hash igual significa con
 - Backup, restauração, atualização e desinstalação.
 - Manual de instalação e operação.
 
-## 8. Indicadores mínimos de aceitação
+## 9. Indicadores mínimos de aceitação
 
 - 0 alteração não autorizada em arquivos originais.
 - 100% dos arquivos processados com status explícito: indexado, ignorado, ausente ou erro.
@@ -179,7 +193,7 @@ Não tratar hash igual como sinônimo de mesmo projeto. Hash igual significa con
 - Testes de instalação e inicialização em Windows 10/11 x64.
 - Nenhuma dependência de servidor ou internet para as funções locais essenciais.
 
-## 9. Referências técnicas oficiais
+## 10. Referências técnicas oficiais
 
 - Tauri 2 — arquitetura: https://v2.tauri.app/concept/architecture/
 - Tauri 2 — início e distribuição: https://v2.tauri.app/start/
@@ -189,7 +203,7 @@ Não tratar hash igual como sinônimo de mesmo projeto. Hash igual significa con
 - IfcOpenShell: https://docs.ifcopenshell.org/
 - PDF.js: https://mozilla.github.io/pdf.js/
 
-## 10. Conclusão
+## 11. Conclusão
 
 A stack atual deve ser mantida, com uma decisão arquitetural clara: **Rust é o núcleo desktop e de indexação local; Python é o motor de extração/análise; React/TypeScript é a interface; SQLite é o banco embarcado**.
 
