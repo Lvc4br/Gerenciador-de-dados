@@ -72,3 +72,9 @@
   .dashboard-actions { width: 100%; }
   .dashboard-actions button { flex: 1 1 auto; justify-content: center; }
 }
+
+
+/* Browser-only preview banner */
+.preview-banner{display:flex;align-items:center;gap:12px;margin:0 0 18px;padding:11px 14px;border:1px solid #e7d7a8;border-radius:10px;background:#fff9e9;color:#755b20;font-size:12px}
+.preview-banner b{flex:none;font-size:10px;letter-spacing:.09em}
+.preview-banner span{color:#75694c}
