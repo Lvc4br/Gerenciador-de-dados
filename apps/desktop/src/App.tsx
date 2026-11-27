@@ -547,11 +547,21 @@ function ReviewPanel() {
               <button className="secondary-button" disabled={busyId === item.id} onClick={() => void review(item, "rejected")}>Rejeitar</button>
               <button className="primary-button" disabled={busyId === item.id} onClick={() => void review(item, "accepted")}>{busyId === item.id ? "Salvando..." : "Aceitar sugestão"}</button>
             </div>}
+            {item.status === "accepted" && <div className="dashboard-actions review-actions">
+              <button className="primary-button" disabled={busyId === item.id} onClick={async () => {
+                setBusyId(item.id); setError(""); setNotice("");
+                try {
+                  await invoke<void>("apply_accepted_filename_suggestion", { id: item.id });
+                  setNotice("Metadados confirmados e histórico de auditoria registrado. O arquivo original não foi alterado.");
+                } catch (reason) { setError(String(reason)); }
+                finally { setBusyId(null); }
+              }}>{busyId === item.id ? "Aplicando..." : "Aplicar aos metadados confirmados"}</button>
+            </div>}
           </article>
         ))}
         {!loading && data.items.length === 0 && <div className="table-empty">Nenhuma sugestão encontrada nesta situação. Execute uma indexação de pasta para analisar os nomes dos arquivos.</div>}
       </div>
-      <p className="detail-note">A aceitação registra somente a decisão sobre a sugestão. O vínculo do documento a um projeto e os metadados oficiais continuam sendo ações separadas.</p>
+      <p className="detail-note">Aceitar registra a decisão. Aplicar grava metadados confirmados e histórico de auditoria; o vínculo do documento a um projeto continua sendo uma ação separada.</p>
     </section>
   );
 }
