@@ -33,6 +33,7 @@ let sampleDisciplines: Array<{id:number;project_id:number;code:string;name:strin
 ];
 let nextDisciplineId = 3;
 let sampleProjectFileLinks: Record<string, number | null> = { '1:1': 1, '1:5': 2 };
+let samplePdfText: Record<number, string> = {};
 
 const sampleDiscrepancies = [
   { id: 1, filename: "AB20A-EST-001.dwg", branch: "Estruturas", number_in_filename: "EST-001", number_in_titleblock: "EST-010", revision: "02", extracted_title: "Planta de formas - tabuleiro", title_for_titleblock_number: "Detalhe de encontro", diagnosis: "Número divergente", artesp_number: "ART-001", internal_number: "EST-001", source_row: 2, source_csv: "divergencias_numero_carimbo.csv" },
@@ -157,6 +158,7 @@ export async function previewInvoke<T>(command: string, args: Record<string, unk
       const projectId = args.projectId == null || args.projectId === "" ? null : Number(args.projectId);
       const disciplineId = args.disciplineId == null || args.disciplineId === "" ? null : Number(args.disciplineId);
       const client = String(args.client ?? "").toLocaleLowerCase("pt-BR");
+      const searchInContent = args.searchInContent === true;
       const filtered = sampleFiles.filter(file => {
         const linkedProjectIds = sampleProjects.filter(project => {
           const rootLinked = (sampleProjectRootLinks[project.id] ?? []).includes(1);
@@ -170,13 +172,22 @@ export async function previewInvoke<T>(command: string, args: Record<string, unk
         const matchesClient = !client || linkedProjectIds.some(item => item.client.toLocaleLowerCase("pt-BR").includes(client));
         return linkedToProject && matchesClient &&
           (disciplineId === null || fileDiscipline === disciplineId) &&
-          (!search || file.filename.toLocaleLowerCase("pt-BR").includes(search) || file.relative_path.toLocaleLowerCase("pt-BR").includes(search)) &&
+          (!search || file.filename.toLocaleLowerCase("pt-BR").includes(search) || file.relative_path.toLocaleLowerCase("pt-BR").includes(search) ||
+            (searchInContent && (samplePdfText[file.id] ?? "").toLocaleLowerCase("pt-BR").includes(search))) &&
           (!extension || file.extension === extension);
       });
       filtered.sort((a, b) => String(a[sortBy as keyof typeof a] ?? a.relative_path).localeCompare(String(b[sortBy as keyof typeof b] ?? b.relative_path), "pt-BR") * (ascending ? 1 : -1));
       const offset = Number(args.offset ?? 0);
       const limit = Number(args.limit ?? 100);
       result = { items: filtered.slice(offset, offset + limit), total: filtered.length };
+      break;
+    }
+    case "extract_pdf_text": {
+      const fileId = Number(args.fileId);
+      const file = sampleFiles.find(item => item.id === fileId);
+      if (!file || file.extension !== "pdf") throw new Error("Selecione um PDF válido.");
+      samplePdfText[fileId] = "Projeto AB20A. Desenho EST-001. Revisão 02. Planta de formas do tabuleiro e estrutura de concreto.";
+      result = { file_id: fileId, character_count: samplePdfText[fileId].length, needs_ocr: false, parser_version: "preview-mock" };
       break;
     }
     case "list_file_versions":
