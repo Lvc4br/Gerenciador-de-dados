@@ -30,6 +30,9 @@
       "nsis",
       "msi"
     ],
+    "icon": [
+      "icons/icon.ico"
+    ],
     "windows": {
       "nsis": {
         "displayLanguageSelector": false
