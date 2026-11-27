@@ -89,6 +89,15 @@ pub fn import_metadata_csv(
         return Ok(0);
     }
 
+    // A source file can change schema between imports; clear the other dataset first.
+    if is_discrepancy {
+        connection.execute("DELETE FROM drawing_metadata WHERE source_file_id=?1", params![source_file_id])
+            .map_err(|e| e.to_string())?;
+    } else {
+        connection.execute("DELETE FROM drawing_discrepancies WHERE source_file_id=?1", params![source_file_id])
+            .map_err(|e| e.to_string())?;
+    }
+
     let mut imported = 0usize;
     for (index, result) in reader.records().enumerate() {
         let record = result.map_err(|e| e.to_string())?;
