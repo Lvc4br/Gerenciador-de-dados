@@ -1122,9 +1122,10 @@ mod backup_tests {
             "INSERT INTO extracted_document_text(file_id,sha256,content,character_count,parser_version,page_count,pages_with_text)
              VALUES (1,'abc','Estrutura de concreto EST-001',30,'test',2,2)", []
         ).expect("insert extracted text");
+        let original_query = "\\"EST-001\\"";
         let found: i64 = connection.query_row(
-            "SELECT COUNT(*) FROM document_text_fts WHERE document_text_fts MATCH '"EST-001"'",
-            [], |row| row.get(0)
+            "SELECT COUNT(*) FROM document_text_fts WHERE document_text_fts MATCH ?1",
+            params![original_query], |row| row.get(0)
         ).expect("search extracted text");
         assert_eq!(found, 1);
 
@@ -1132,12 +1133,13 @@ mod backup_tests {
             "UPDATE extracted_document_text SET content='Memorial de drenagem DRE-014' WHERE file_id=1", []
         ).expect("update extracted text");
         let stale: i64 = connection.query_row(
-            "SELECT COUNT(*) FROM document_text_fts WHERE document_text_fts MATCH 'EST-001'",
-            [], |row| row.get(0)
+            "SELECT COUNT(*) FROM document_text_fts WHERE document_text_fts MATCH ?1",
+            params![original_query], |row| row.get(0)
         ).expect("search stale content");
+        let updated_query = "\\"DRE-014\\"";
         let current: i64 = connection.query_row(
-            "SELECT COUNT(*) FROM document_text_fts WHERE document_text_fts MATCH 'DRE-014'",
-            [], |row| row.get(0)
+            "SELECT COUNT(*) FROM document_text_fts WHERE document_text_fts MATCH ?1",
+            params![updated_query], |row| row.get(0)
         ).expect("search current content");
         assert_eq!(stale, 0);
         assert_eq!(current, 1);
