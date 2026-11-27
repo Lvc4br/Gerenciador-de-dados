@@ -42,8 +42,6 @@ O principal ajuste arquitetural recomendado é separar claramente as responsabil
 - Não há leitura direta do conteúdo DWG, PDF ou Office no fluxo do desktop.
 - Não há visualizador de documentos integrado.
 - Há histórico de fingerprints SHA-256 distintos por arquivo, com tamanho e datas; ainda não há cópias binárias para restauração.
-- Backup consistente do SQLite via API online backup do SQLite, com verificação `integrity_check` após criação.
-- Restauração de backup GED validado, com cópia automática do banco atual antes da substituição.
 - Não há busca textual FTS5, apesar de prevista na arquitetura.
 - Não há módulo funcional de cadastro de projetos, exportações ou configurações; partes da navegação ainda são placeholders.
 - Não há trilha de auditoria operacional completa.
@@ -53,7 +51,9 @@ O principal ajuste arquitetural recomendado é separar claramente as responsabil
 
 Na continuação da Fase 0, foram adicionadas à branch:
 - Registro de execuções de varredura em `scan_runs`.
-- Histórico de versões por SHA-256, com tamanho e datas, exibido nas propriedades do arquivo. O histórico registra fingerprints e metadados, não cópias físicas do conteúdo; backup de binários permanece como etapa separada.
+- Histórico de versões por SHA-256, com tamanho e datas, exibido nas propriedades do arquivo. O histórico registra fingerprints e metadados, não cópias físicas do conteúdo.
+- Backup consistente do SQLite pela API online backup do SQLite, com verificação `integrity_check`.
+- Restauração de backup GED validado, precedida por cópia automática do banco atual.
 - Migração compatível para adicionar `last_seen_scan_id` em bancos já existentes.
 - Reconciliação de arquivos não encontrados: quando a travessia da pasta termina sem erro, os registros não vistos são marcados como `missing`, sem apagar seus dados.
 - Erros de travessia impedem a marcação global de ausentes, evitando falsos positivos em varreduras parciais.
@@ -69,12 +69,12 @@ Na continuação da Fase 0, foram adicionadas à branch:
 | Prioridade | Achado | Risco / efeito | Recomendação |
 |---|---|---|---|
 | **Crítica** | Build e execução em Windows ainda não comprovados | O produto pode não compilar, instalar ou abrir no ambiente-alvo | Fazer primeiro build limpo em Windows 10 e 11 x64; guardar logs e artefatos de CI |
-| **Alta** | Scanner Rust síncrono e sem progresso/cancelamento | Pastas grandes podem congelar a interface ou parecer travadas | Mover varredura/hash para execução assíncrona ou `spawn_blocking`; emitir eventos de progresso e permitir cancelar com segurança |
-| **Alta** | Arquivos removidos da pasta não são reconciliados no catálogo | O GED pode continuar exibindo caminhos que já não existem | Registrar início/fim de cada varredura e marcar como ausentes os itens não vistos, sem apagar histórico |
-| **Alta** | Erros do WalkDir são descartados por `filter_map(Result::ok)` | Falhas de acesso a subpastas podem passar despercebidas | Contabilizar e registrar cada erro com caminho e código seguro |
+| **Alta — parcial** | Scanner agora usa `spawn_blocking` e informa progresso, mas ainda não pode ser cancelado | Uma varredura longa não pode ser interrompida pelo usuário | Implementar cancelamento cooperativo, com fechamento seguro da transação e atualização do estado da execução |
+| **Resolvido na branch** | Arquivos removidos da pasta não eram reconciliados | O catálogo podia manter caminhos antigos como se estivessem presentes | `scan_runs` e `last_seen_scan_id` marcam itens como `missing` somente após travessia completa |
+| **Parcial** | Erros de travessia são contabilizados e impedem reconciliação global, mas não há relatório detalhado por caminho | A equipe sabe que a varredura foi parcial, mas não identifica facilmente a pasta problemática | Registrar caminho, tipo e mensagem segura de cada falha |
 | **Alta** | O mesmo scanner existe em Rust e Python, mas só o Rust está ligado ao app | Duas implementações podem divergir e gerar resultados diferentes | Definir um único scanner oficial. Recomendação: Rust para indexação local; Python apenas para parsing/análise |
 | **Alta — parcial** | Reindexação atualiza os metadados atuais; histórico guarda SHA-256, tamanho e datas, mas não o binário | É possível provar que o conteúdo mudou, mas não restaurar uma versão antiga | Adicionar armazenamento de conteúdo versionado ou snapshot com política de retenção e backup |
-| **Alta** | Importação CSV faz upsert por linha, mas não reconcilia linhas removidas do CSV | Ao atualizar um CSV para menos registros, linhas antigas podem continuar no banco | Importar por lote com transação/savepoint e reconciliar todas as linhas do arquivo de origem |
+| **Resolvido na branch** | Reimportação CSV podia manter linhas antigas e dados de esquema anterior | A tela podia exibir ocorrências obsoletas | Savepoint, remoção de linhas excedentes e limpeza ao mudar o tipo de esquema |
 | **Média** | Busca do Explorer usa LIKE; FTS5 não foi criado | Busca em grandes catálogos ficará limitada e menos relevante | Criar índice FTS5 para nome, título, identificadores e texto extraído; manter filtros estruturados em SQL |
 | **Média** | Erros de importação CSV são somados ao contador genérico de indexação | O usuário não sabe se falhou o hash, a leitura ou a interpretação do CSV | Separar erros de acesso, hash, formato e extração; exibir relatório por arquivo |
 | **Média** | Interface contém ações e módulos ainda sem comportamento | Pode induzir o usuário a esperar funcionalidades inexistentes | Ocultar/desabilitar ações não entregues e mostrar claramente “em desenvolvimento” |
