@@ -16,8 +16,6 @@ struct ScanSummary {
     skipped: u64,
     errors: u64,
     duplicate_hash_groups: u64,
-    drawing_metadata_count: u64,
-    discrepancy_count: u64,
 }
 
 #[derive(Serialize)]
@@ -25,6 +23,8 @@ struct DashboardStats {
     root_count: u64,
     file_count: u64,
     duplicate_hash_groups: u64,
+    drawing_metadata_count: u64,
+    discrepancy_count: u64,
 }
 
 fn database_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
