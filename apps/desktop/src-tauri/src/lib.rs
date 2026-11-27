@@ -702,6 +702,52 @@ async fn extract_pdf_text(app: tauri::AppHandle, file_id: i64) -> Result<serde_j
         .map_err(|error| error.to_string())?
 }
 
+fn extract_pending_pdf_text_blocking(app: tauri::AppHandle, limit: u32) -> Result<serde_json::Value, String> {
+    let connection = open_database(&app)?;
+    let mut statement = connection.prepare(
+        "SELECT f.id FROM files f
+         LEFT JOIN extracted_document_text x ON x.file_id=f.id
+         WHERE f.status='indexed' AND lower(f.extension)='pdf'
+           AND (x.file_id IS NULL OR x.sha256 != f.sha256)
+         ORDER BY f.id LIMIT ?1"
+    ).map_err(|e| e.to_string())?;
+    let rows = statement.query_map(params![limit.clamp(1, 200)], |row| row.get::<_, i64>(0))
+        .map_err(|e| e.to_string())?;
+    let mut ids = Vec::new();
+    for row in rows { ids.push(row.map_err(|e| e.to_string())?); }
+    drop(statement);
+    drop(connection);
+
+    let mut processed = 0u64;
+    let mut needs_ocr = 0u64;
+    let mut errors: Vec<serde_json::Value> = Vec::new();
+    for file_id in ids {
+        match extract_pdf_text_blocking(app.clone(), file_id) {
+            Ok(result) => {
+                processed += 1;
+                if result.get("needs_ocr").and_then(|value| value.as_bool()).unwrap_or(false) {
+                    needs_ocr += 1;
+                }
+            }
+            Err(error) => errors.push(serde_json::json!({ "file_id": file_id, "error": error })),
+        }
+    }
+    Ok(serde_json::json!({
+        "processed": processed,
+        "needs_ocr": needs_ocr,
+        "errors": errors.len(),
+        "error_details": errors
+    }))
+}
+
+#[tauri::command]
+async fn extract_pending_pdf_text(app: tauri::AppHandle, limit: Option<u32>) -> Result<serde_json::Value, String> {
+    let limit = limit.unwrap_or(50).clamp(1, 200);
+    tauri::async_runtime::spawn_blocking(move || extract_pending_pdf_text_blocking(app, limit))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
 #[derive(Serialize)]
 struct FileVersionRecord {
     id: i64,
@@ -941,7 +987,7 @@ fn set_project_file_link(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![scan_folder, get_dashboard_stats, create_database_backup, restore_database_backup, list_files, extract_pdf_text, list_file_versions, list_discrepancies, list_filename_suggestions, review_filename_suggestion, apply_accepted_filename_suggestion, list_projects, create_project, update_project, archive_project, list_project_roots, set_project_root_link, list_project_disciplines, save_project_discipline, delete_project_discipline, list_project_files, set_project_file_link])
+        .invoke_handler(tauri::generate_handler![scan_folder, get_dashboard_stats, create_database_backup, restore_database_backup, list_files, extract_pdf_text, extract_pending_pdf_text, list_file_versions, list_discrepancies, list_filename_suggestions, review_filename_suggestion, apply_accepted_filename_suggestion, list_projects, create_project, update_project, archive_project, list_project_roots, set_project_root_link, list_project_disciplines, save_project_discipline, delete_project_discipline, list_project_files, set_project_file_link])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar o GED Desktop");
 }
