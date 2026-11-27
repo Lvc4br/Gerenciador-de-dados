@@ -1,46 +1,43 @@
 # GED — Gerenciador de Engenharia e Documentos
 
-Aplicativo **desktop para Windows**, distribuído como instalador e executável `.exe`, para organizar, localizar, analisar, comparar e reutilizar projetos anteriores de engenharia civil.
+Aplicativo **desktop para Windows**, distribuído como instalador e executável, para organizar, localizar, analisar, comparar e reutilizar projetos anteriores de engenharia civil.
 
 > **Objetivo:** transformar arquivos históricos dispersos em uma base documental local, pesquisável, rastreável e confiável para apoiar engenheiros.
 
 ## Produto e plataforma
 
-O GED é um programa instalado no computador do usuário. A operação principal deve funcionar **offline**, sem depender de navegador, servidor remoto ou conexão com a internet. Acesso a pastas locais, discos externos e compartilhamentos de rede será parte central do produto.
+O GED é um programa instalado no computador do usuário. A operação principal deve funcionar **offline**, sem depender de navegador, servidor remoto ou conexão com a internet. O alvo inicial é Windows 10 ou superior, x64, com um engenheiro usando um computador por vez.
 
-A arquitetura também deve permitir, futuramente, sincronização opcional com um servidor corporativo para equipes e múltiplos computadores. Essa evolução não pode ser requisito para o MVP.
+A arquitetura poderá evoluir para sincronização opcional com servidor corporativo, mas isso não é requisito do MVP.
 
 ## Visão do produto
 
-- Explorador semelhante ao Windows Explorer, com árvore de pastas, breadcrumbs, lista/grade, preview e propriedades.
-- Importação/indexação de pastas inteiras e discos, sem modificar os originais.
+- Explorador semelhante ao Windows Explorer, com lista, propriedades, filtros e pesquisa.
+- Importação/indexação de pastas inteiras, sem modificar os originais.
 - Extração de metadados de arquivos, carimbos, textos, tabelas e propriedades CAD/BIM.
 - Classificação assistida e taxonomia configurável.
 - Busca textual, filtros, similaridade técnica e recomendações explicáveis.
 - Detecção de divergências, duplicidades, lacunas e conflitos.
 - Comparação de revisões e emissão de relatórios.
 - Exportação de originais, metadados, resultados e pacotes.
-- Banco de dados local, backup, auditoria e controle de acesso local.
+- Banco local, backup e auditoria.
 
-## Stack desktop recomendada
+## Stack recomendada
 
 | Camada | Tecnologia |
 |---|---|
-| Aplicativo Windows | Tauri 2 |
+| Aplicativo Windows | Tauri 2 + Rust |
 | Interface | React + TypeScript |
-| Estilo e componentes | Tailwind CSS + componentes acessíveis |
-| Núcleo de processamento | Python empacotado como sidecar (PyInstaller) |
-| Comunicação UI/núcleo | Tauri commands + IPC local restrito |
-| Banco local | SQLite + FTS5; migrações via SQLAlchemy/Alembic ou equivalente |
-| Busca semântica | Índice vetorial local opcional, com fallback semântico/lexical |
-| Arquivos | Sistema de arquivos local; originais preservados no local escolhido |
-| Filas | SQLite job queue / worker local; Redis não é obrigatório no desktop |
-| PDF e imagens | PDF.js e bibliotecas de imagem |
-| CAD/BIM | Adaptadores isolados; validar SDK, versão e licença |
-| Empacotamento | Tauri bundler + instalador Windows (.msi/.exe) |
-| Testes | Pytest, Vitest e Playwright/Webdriver conforme camada |
+| Processamento documental | Python empacotado como sidecar (PyInstaller), quando integrado |
+| Banco local | SQLite + FTS5 |
+| PDF | PDF.js |
+| OCR | Tesseract como primeira prova de conceito |
+| CSV/Office | Bibliotecas Python especializadas por formato |
+| CAD/BIM | Adaptadores isolados; validar SDK, versões e licenças |
+| Testes | pytest, testes Rust e testes de interface |
+| CI e instaladores | GitHub Actions em Windows x64; MSI/NSIS |
 
-**Por que Tauri:** entrega uma aplicação desktop leve, com interface web moderna e acesso controlado a recursos nativos. Python fica responsável pelo ecossistema de extração documental e engenharia. O sidecar será empacotado junto ao aplicativo; o usuário não precisará instalar Python.
+**Divisão recomendada:** Rust/Tauri para desktop, permissões e operações locais; React/TypeScript para interface; Python para extração e análise documental; SQLite para catálogo e busca local. Não adicionar PostgreSQL, Redis ou nuvem no MVP single-user.
 
 ## Evidência inicial: conjunto AB20A
 
@@ -49,50 +46,51 @@ Foi inspecionado o pacote de amostra `AB20A.zip`, com:
 - `titulos_carimbo.csv`: 1.336 linhas e 14 colunas;
 - `divergencias_numero_carimbo.csv`: 9 linhas e 11 colunas.
 
-Os CSVs usam delimitador ponto e vírgula e codificação UTF-8 com BOM. Entre os campos encontrados estão arquivo, ramo, candidato a título, rodovia, trecho, escala, desenho ARTESP, desenho interno, número no nome, número no carimbo, revisão, diagnóstico e caminho original.
+Os CSVs usam delimitador ponto e vírgula e codificação UTF-8 com BOM. Entre os campos estão arquivo, ramo, candidato a título, rodovia, trecho, escala, desenho ARTESP, desenho interno, número no nome, número no carimbo, revisão, diagnóstico e caminho original.
 
-A amostra demonstra um caso de uso concreto: conferir se o identificador do arquivo, o número no carimbo e o título associado ao desenho são coerentes. Os CSVs são evidência de metadados extraídos; não substituem a inspeção integral dos DWGs nem uma validação técnica do projeto.
+A amostra demonstra um caso de uso concreto: conferir se identificadores e títulos associados ao desenho são coerentes. Os CSVs são evidência de metadados extraídos; não substituem a inspeção integral dos DWGs nem uma validação técnica do projeto.
 
 ## Documentação
 
 - [Arquitetura desktop](docs/ARCHITECTURE.md)
-- [Modelo de dados e schema](docs/DATA_MODEL.md)
-- [Experiência e layout](docs/UX.md)
+- [Modelo de dados](docs/DATA_MODEL.md)
+- [Desenvolvimento](docs/DEVELOPMENT.md)
 - [Plano de desenvolvimento](docs/ROADMAP.md)
-- [Matriz de formatos](docs/FORMAT_SUPPORT.md)
 - [Backend e comunicação local](docs/API_AND_BACKEND.md)
+- [Auditoria técnica e recomendações de stack](docs/TECHNICAL_AUDIT.md)
 
 ## Princípios não negociáveis
 
 1. Nunca alterar o arquivo original durante ingestão, leitura ou análise.
 2. Calcular hash SHA-256 e preservar proveniência, datas e origem.
 3. Não confundir alerta automatizado com não conformidade de engenharia.
-4. Mostrar evidências, regra aplicada, confiança e versão do analisador em cada achado.
-5. Não sobrescrever revisões: cada versão é imutável e ligada à anterior quando possível.
+4. Mostrar evidências, regra aplicada e versão do analisador em cada achado.
+5. Não sobrescrever revisões: cada versão deve ser preservada.
 6. Permitir correção humana, registrar quem corrigiu e preservar o valor extraído.
 7. Respeitar licenças de bibliotecas, conversores e formatos proprietários.
 8. Restringir acesso a arquivos locais aos diretórios autorizados pelo usuário.
-9. Exportar com manifesto, origem e trilha de auditoria quando aplicável.
+9. Não enviar documentos para serviços externos/IA em nuvem sem consentimento explícito.
 10. Tratar arquivos não suportados ou corrompidos como falhas explícitas, nunca como sucesso silencioso.
-11. Operações essenciais devem funcionar offline.
-12. Não enviar documentos para serviços externos/IA em nuvem sem consentimento explícito.
 
 ## Estado atual da implementação
 
-A branch `feature/mvp-core-indexer` contém o primeiro esqueleto de implementação:
+A branch `feature/mvp-core-indexer` contém:
 - shell desktop Tauri 2 com interface React/TypeScript;
-- painel inicial e navegação visual do GED;
-- seletor nativo de pasta;
-- indexador nativo inicial que percorre diretórios sem seguir links simbólicos, calcula SHA-256 e registra os arquivos em SQLite local;
-- indicadores locais de pastas, arquivos e grupos com hashes duplicados;
-- núcleo Python inicial e testes automatizados para evolução dos parsers.
+- seletor nativo de pastas;
+- indexador Rust inicial com SHA-256 e SQLite local;
+- indicadores de pastas, arquivos e grupos de hashes duplicados;
+- Explorador conectado ao banco, com pesquisa por nome/caminho, filtro de extensão, ordenação, paginação e propriedades;
+- importação dos dois esquemas CSV reconhecidos da amostra;
+- tela de consulta de divergências importadas, com origem e linha do CSV;
+- núcleo Python inicial e testes do scanner, ainda não integrado ao desktop como sidecar.
 
-**Ainda não é uma versão pronta para uso ou distribuição.** A compilação e os testes precisam ser executados em ambiente Windows; os módulos de visualização, leitura avançada, divergências de metadados, busca e exportação ainda serão implementados.
+**Ainda não é uma versão pronta para uso ou distribuição.** Não há build Windows aprovado nem instalador validado. A leitura direta de DWG/PDF/Office, visualizadores, versões imutáveis, busca FTS5, exportações completas e auditoria operacional ainda precisam ser implementadas.
 
 ## Próximas entregas
 
-1. Validar compilação Tauri e indexação em Windows 10/11.
-2. Criar explorador de arquivos conectado ao SQLite, com pesquisa, filtros e ordenação.
-3. Implementar leitura de CSV/TXT/JSON e PDF, incluindo metadados com proveniência.
-4. Implementar regras de divergência e relatórios com evidências.
-5. Integrar visualizadores e adaptadores CAD/BIM após testes de compatibilidade/licença.
+1. Estabilizar varredura, erros, reconciliação e build Windows.
+2. Implementar versões imutáveis, migrações e backup SQLite.
+3. Consolidar catálogo de projetos e busca FTS5.
+4. Implementar leitura de PDF/Office e visualização segura.
+5. Fazer prova de conceito DWG/DXF/IFC com validação de licença e compatibilidade.
+6. Implementar comparação, recomendações explicáveis e exportação com evidências.
