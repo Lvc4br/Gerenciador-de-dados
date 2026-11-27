@@ -302,3 +302,35 @@ CREATE INDEX audit_workspace_time_idx ON audit_events(workspace_id, occurred_at 
 ```
 
 A regra precisa permitir exceções por padrão documental, organização, órgão e disciplina. Não aplicar normalização que apague diferenças significativas de identificadores.
+
+
+## 6. Schema SQLite efetivamente implementado no MVP desktop
+
+O schema PostgreSQL acima é referência para uma futura edição corporativa. O executável atual usa SQLite e tem as seguintes entidades implementadas:
+
+| Tabela | Responsabilidade |
+|---|---|
+| `scan_roots` | Pastas físicas autorizadas para indexação |
+| `scan_runs` | Execuções de varredura e estado da reconciliação |
+| `files` | Referências a arquivos originais, caminho, tamanho, hash e status |
+| `file_versions` | Histórico de hashes, tamanho e datas; não guarda cópias binárias |
+| `projects` | Catálogo lógico de projetos, com código, cliente e status |
+| `project_roots` | Relação reutilizável entre projetos e pastas indexadas |
+| `project_disciplines` | Disciplinas configuráveis por projeto |
+| `project_file_links` | Associação individual de documentos a projetos e disciplinas |
+| `filename_suggestions` | Candidatos derivados do nome ou conteúdo PDF, separados dos valores confirmados |
+| `confirmed_document_metadata` | Metadados explicitamente aceitos |
+| `metadata_audit_log` | Valores anteriores/novos e ação de confirmação |
+| `drawing_metadata` / `drawing_discrepancies` | Metadados e divergências importados dos CSVs |
+| `extracted_document_text` | Texto PDF extraído, SHA-256 de origem, página, parser e candidatos de metadados |
+| `files_fts` | Índice FTS5 de nome e caminho |
+| `document_text_fts` | Índice FTS5 de conteúdo textual PDF |
+
+### Migrações do desktop
+
+- Versões 1–3: baseline de varredura/histórico, índices de catálogo e FTS5 de nome/caminho.
+- Versões 4–5: catálogo de projetos e relações de projeto/documento.
+- Versões 6–8: texto extraído de PDF e FTS5, contagem de páginas e candidatos de número, revisão e título.
+- Os módulos de projeto e sugestões mantêm suas próprias verificações idempotentes na tabela `schema_migrations`.
+
+A busca de conteúdo exige que o SHA-256 armazenado no texto extraído corresponda ao hash atual do registro do arquivo. Isso evita que uma extração antiga seja tratada como atual depois de uma nova varredura detectar alteração. O arquivo físico nunca é movido nem modificado pela extração.
