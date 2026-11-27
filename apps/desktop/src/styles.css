@@ -25,3 +25,18 @@
 
 .discrepancy-layout{grid-template-columns:minmax(0,1fr) 310px}.discrepancy-table td{vertical-align:middle}.finding-tag{display:inline-block;max-width:260px;white-space:normal;line-height:1.4;border-radius:5px;padding:5px 7px;font-size:9px}.finding-tag.mismatch{background:#fff4e8;color:#a96b25}.finding-tag.copy{background:#edf3ff;color:#5677ac}
 @media(max-width:1180px){.discrepancy-layout{grid-template-columns:minmax(0,1fr) 260px}.discrepancy-table th:nth-child(2),.discrepancy-table td:nth-child(2){display:none}}
+
+
+.file-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 650;
+  background: #e8f4ec;
+  color: #23643b;
+}
+.file-status.missing { background: #fff0ed; color: #a43c2e; }
+.file-status.skipped { background: #f2f0e9; color: #6e6242; }
+.file-status.error { background: #fff0ed; color: #a43c2e; }
