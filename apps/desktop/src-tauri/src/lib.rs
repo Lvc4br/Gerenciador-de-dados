@@ -551,6 +551,7 @@ fn list_files(
     client: Option<String>,
     sort_by: Option<String>,
     ascending: Option<bool>,
+    search_in_content: Option<bool>,
     limit: Option<u32>,
     offset: Option<u32>,
 ) -> Result<FilePage, String> {
@@ -567,6 +568,7 @@ fn list_files(
         "SELECT COUNT(*) FROM files f
          WHERE (?1 = '' OR
            (?2 != '' AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?2)) OR
+           (?9 = 1 AND ?2 != '' AND f.id IN (SELECT rowid FROM document_text_fts WHERE document_text_fts MATCH ?2)) OR
            (?2 = '' AND (f.filename LIKE ?3 ESCAPE '\\' OR f.relative_path LIKE ?3 ESCAPE '\\')))
          AND (?4 IS NULL OR lower(f.extension) = ?4)
          AND (?5 IS NULL OR EXISTS (
@@ -585,7 +587,7 @@ fn list_files(
            WHERE (pr.project_id IS NOT NULL OR pfl.project_id IS NOT NULL)
              AND p.client LIKE ?8 ESCAPE '\\'
          ))",
-        params![search, fts_query, pattern, extension_filter, project_id, discipline_id, client, client_pattern],
+        params![search, fts_query, pattern, extension_filter, project_id, discipline_id, client, client_pattern, search_in_content.unwrap_or(false)],
         |row| row.get(0)
     ).map_err(|e| e.to_string())?;
 
@@ -603,6 +605,7 @@ fn list_files(
          FROM files f JOIN scan_roots r ON r.id = f.root_id
          WHERE (?1 = '' OR
            (?2 != '' AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?2)) OR
+           (?9 = 1 AND ?2 != '' AND f.id IN (SELECT rowid FROM document_text_fts WHERE document_text_fts MATCH ?2)) OR
            (?2 = '' AND (f.filename LIKE ?3 ESCAPE '\\' OR f.relative_path LIKE ?3 ESCAPE '\\')))
            AND (?4 IS NULL OR lower(f.extension) = ?4)
            AND (?5 IS NULL OR EXISTS (
@@ -626,7 +629,7 @@ fn list_files(
     );
     let mut statement = connection.prepare(&sql).map_err(|e| e.to_string())?;
     let rows = statement.query_map(
-        params![search, fts_query, pattern, extension_filter, project_id, discipline_id, client, client_pattern, limit.unwrap_or(100).clamp(1, 500), offset.unwrap_or(0)],
+        params![search, fts_query, pattern, extension_filter, project_id, discipline_id, client, client_pattern, search_in_content.unwrap_or(false), limit.unwrap_or(100).clamp(1, 500), offset.unwrap_or(0)],
         |row| Ok(FileRecord {
             id: row.get(0)?,
             filename: row.get(1)?,
