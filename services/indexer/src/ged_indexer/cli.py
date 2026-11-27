@@ -12,7 +12,7 @@ from .pdf import extract_pdf_text, PdfExtractionError
 from .naming import extract_filename_metadata
 
 def build_content_fts_query(query: str) -> str:
-    terms = [term for term in re.findall(r"[^\\W_]+", query, flags=re.UNICODE) if len(term) >= 2]
+    terms = [term for term in re.findall(r"[^\W_]+", query, flags=re.UNICODE) if len(term) >= 2]
     if not terms:
         raise ValueError("Informe ao menos um termo com dois ou mais caracteres.")
     return " AND ".join(f'"{term.replace(chr(34), chr(34) * 2)}"*' for term in terms)
