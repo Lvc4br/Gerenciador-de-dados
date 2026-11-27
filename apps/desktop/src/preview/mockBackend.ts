@@ -180,7 +180,14 @@ export async function previewInvoke<T>(command: string, args: Record<string, unk
       filtered.sort((a, b) => String(a[sortBy as keyof typeof a] ?? a.relative_path).localeCompare(String(b[sortBy as keyof typeof b] ?? b.relative_path), "pt-BR") * (ascending ? 1 : -1));
       const offset = Number(args.offset ?? 0);
       const limit = Number(args.limit ?? 100);
-      result = { items: filtered.slice(offset, offset + limit), total: filtered.length };
+      result = {
+        items: filtered.slice(offset, offset + limit).map(file => ({
+          ...file,
+          content_snippet: searchInContent && samplePdfText[file.id]?.toLocaleLowerCase("pt-BR").includes(search)
+            ? samplePdfText[file.id] : null
+        })),
+        total: filtered.length
+      };
       break;
     }
     case "extract_pdf_text": {
