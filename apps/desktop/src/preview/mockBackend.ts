@@ -14,7 +14,8 @@ let sampleProjects = [
   { id: 1, code: 'AB20A', name: 'Adequação da Ponte AB20A', client: 'ARTESP', description: 'Projeto demonstrativo de engenharia', status: 'active', root_count: 1, file_count: 6, created_at: '2026-11-01', updated_at: '2026-11-20' }
 ];
 let nextProjectId = 2;
-const sampleRoots = [{ id: 1, path: 'C:\\\\Projetos\\\\AB20A', added_at: '2026-10-01', linked: false }];
+const sampleRoots = [{ id: 1, path: 'C:\\\\Projetos\\\\AB20A', added_at: '2026-10-01' }];
+let sampleProjectRootLinks: Record<number, number[]> = { 1: [1] };
 
 const sampleDiscrepancies = [
   { id: 1, filename: "AB20A-EST-001.dwg", branch: "Estruturas", number_in_filename: "EST-001", number_in_titleblock: "EST-010", revision: "02", extracted_title: "Planta de formas - tabuleiro", title_for_titleblock_number: "Detalhe de encontro", diagnosis: "Número divergente", artesp_number: "ART-001", internal_number: "EST-001", source_row: 2, source_csv: "divergencias_numero_carimbo.csv" },
@@ -31,7 +32,7 @@ export async function previewInvoke<T>(command: string, args: Record<string, unk
       const status = String(args.status ?? "");
       const filtered = sampleProjects.filter(p =>
         (!search || [p.code,p.name,p.client].some(v => v.toLocaleLowerCase("pt-BR").includes(search))) &&
-        (!status || p.status === status)
+        (!status || status === "all" || p.status === status)
       );
       const offset = Number(args.offset ?? 0), limit = Number(args.limit ?? 100);
       result = { items: filtered.slice(offset, offset + limit), total: filtered.length };
@@ -60,12 +61,20 @@ export async function previewInvoke<T>(command: string, args: Record<string, unk
       result = null;
       break;
     }
-    case "list_project_roots":
-      result = sampleRoots.map(root => ({ ...root, linked: false }));
+    case "list_project_roots": {
+      const projectId = Number(args.projectId);
+      result = sampleRoots.map(root => ({ ...root, linked: (sampleProjectRootLinks[projectId] ?? []).includes(root.id) }));
       break;
-    case "set_project_root_link":
+    }
+    case "set_project_root_link": {
+      const projectId = Number(args.projectId), rootId = Number(args.rootId);
+      const links = sampleProjectRootLinks[projectId] ?? [];
+      sampleProjectRootLinks[projectId] = args.linked ? [...new Set([...links, rootId])] : links.filter(id => id !== rootId);
+      const rootCount = sampleProjectRootLinks[projectId].length;
+      sampleProjects = sampleProjects.map(p => p.id === projectId ? { ...p, root_count: rootCount, file_count: rootCount ? 6 : 0 } : p);
       result = null;
       break;
+    }
     case "get_dashboard_stats":
       result = { root_count: 3, file_count: 1342, duplicate_hash_groups: 8, drawing_metadata_count: 1336, discrepancy_count: sampleDiscrepancies.length };
       break;
