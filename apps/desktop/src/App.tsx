@@ -29,7 +29,7 @@ type FileRecord = {
 };
 type FilePage = { items: FileRecord[]; total: number };
 
-function formatBytes(bytes: number) {
+function formatDate(value: string, includeTime = false) {\n  if (!value) return '—';\n  const numeric = Number(value);\n  const date = new Date(Number.isFinite(numeric) ? numeric * 1000 : value);\n  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('pt-BR', includeTime ? { dateStyle: 'short', timeStyle: 'short' } : { dateStyle: 'short' });\n}\n\nfunction formatBytes(bytes: number) {
   if (bytes < 1024) return String(bytes) + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
   if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
@@ -87,7 +87,7 @@ function ExplorerPanel() {
                 <td><div className="file-name"><FileText size={16} /><div><b>{file.filename}</b><small>{file.relative_path}</small></div></div></td>
                 <td><span className="file-ext">{file.extension ? file.extension.toUpperCase() : 'SEM TIPO'}</span></td>
                 <td>{formatBytes(file.byte_size)}</td>
-                <td>{file.modified_at ? new Date(file.modified_at).toLocaleDateString('pt-BR') : '—'}</td>
+                <td>{formatDate(file.modified_at)}</td>
               </tr>)}
               {!loading && data.items.length === 0 && <tr><td colSpan={4} className="table-empty">Nenhum arquivo encontrado. Importe uma pasta na Visão geral para começar.</td></tr>}
             </tbody>
@@ -101,7 +101,7 @@ function ExplorerPanel() {
             <div className="detail-row"><span>Localização</span><b>{selected.root_path}\\{selected.relative_path}</b></div>
             <div className="detail-row"><span>Extensão</span><b>{selected.extension || '—'}</b></div>
             <div className="detail-row"><span>Tamanho</span><b>{formatBytes(selected.byte_size)}</b></div>
-            <div className="detail-row"><span>Modificado</span><b>{selected.modified_at ? new Date(selected.modified_at).toLocaleString('pt-BR') : '—'}</b></div>
+            <div className="detail-row"><span>Modificado</span><b>{formatDate(selected.modified_at, true)}</b></div>
             <div className="detail-row hash-row"><span>SHA-256</span><code>{selected.sha256}</code></div>
             <p className="detail-note">Os dados acima foram registrados na indexação. A visualização do conteúdo e a extração de metadados serão adicionadas em uma próxima etapa.</p>
           </> : <p className="detail-note">Selecione um arquivo na lista para consultar suas propriedades.</p>}
