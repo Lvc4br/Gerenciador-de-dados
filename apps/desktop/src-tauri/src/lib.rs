@@ -792,7 +792,7 @@ fn extract_pdf_text_blocking(app: tauri::AppHandle, file_id: i64) -> Result<serd
                 pages_with_text as i64, drawing_number, revision, candidate_title, metadata_confidence]
     ).map_err(|e| format!("Não foi possível salvar o texto extraído: {e}"))?;
 
-    if drawing_number.is_some() || revision.is_some() || candidate_title.is_some() {
+    if drawing_number.is_some() || revision.is_some() {
         let has_filename_suggestion: bool = transaction.query_row(
             "SELECT EXISTS(SELECT 1 FROM filename_suggestions WHERE file_id=?1 AND parser_version='1')",
             params![file_id], |row| row.get(0)
