@@ -50,6 +50,10 @@ Os CSVs usam delimitador ponto e vírgula e codificação UTF-8 com BOM. Entre o
 
 A amostra demonstra um caso de uso concreto: conferir se identificadores e títulos associados ao desenho são coerentes. Os CSVs são evidência de metadados extraídos; não substituem a inspeção integral dos DWGs nem uma validação técnica do projeto.
 
+## Prévia visual no VS Code
+
+Para abrir uma demonstração da interface sem compilar Rust, consulte [o guia de desenvolvimento](docs/DEVELOPMENT.md#abrir-uma-prévia-visual-no-vs-code-sem-rust). A prévia usa dados fictícios; o indexador, SQLite, backup e restauração só funcionam no aplicativo desktop Tauri.
+
 ## Documentação
 
 - [Arquitetura desktop](docs/ARCHITECTURE.md)
@@ -76,6 +80,7 @@ A amostra demonstra um caso de uso concreto: conferir se identificadores e títu
 
 A branch `feature/mvp-core-indexer` contém:
 - shell desktop Tauri 2 com interface React/TypeScript;
+- modo de prévia visual no navegador, com backend simulado para desenvolvimento rápido no VS Code;
 - seletor nativo de pastas;
 - indexador Rust inicial com SHA-256 e SQLite local, executado fora da thread da interface;
 - registro de execuções de varredura e reconciliação de arquivos ausentes, sem apagar os registros;
