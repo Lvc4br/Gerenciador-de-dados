@@ -80,6 +80,7 @@ A branch `feature/mvp-core-indexer` contém:
 - indexador Rust inicial com SHA-256 e SQLite local, executado fora da thread da interface;
 - registro de execuções de varredura e reconciliação de arquivos ausentes, sem apagar os registros;
 - estados de arquivo indexado, ignorado, com erro ou ausente;
+- histórico de versões por hash SHA-256, tamanho e datas, sem cópia binária do conteúdo;
 - indicadores de pastas, arquivos indexados e grupos de hashes duplicados;
 - Explorador conectado ao banco, com pesquisa por nome/caminho, filtro de extensão, ordenação, paginação e propriedades;
 - importação dos dois esquemas CSV reconhecidos da amostra;
@@ -87,7 +88,7 @@ A branch `feature/mvp-core-indexer` contém:
 - reimportação CSV transacional com savepoint, limpeza de linhas excedentes e reconciliação quando o esquema da fonte muda;
 - núcleo Python inicial e testes do scanner, ainda não integrado ao desktop como sidecar.
 
-**Ainda não é uma versão pronta para uso ou distribuição.** A varredura é executada fora da thread da interface e informa progresso periodicamente; ainda não há cancelamento. Não há build Windows aprovado nem instalador validado. A leitura direta de DWG/PDF/Office, visualizadores, versões imutáveis, busca FTS5, exportações completas e auditoria operacional ainda precisam ser implementadas.
+**Ainda não é uma versão pronta para uso ou distribuição.** O build Windows também recebeu uma correção para gerar o ícone ICO exigido pelo Tauri; a correção aguarda confirmação no CI. A varredura é executada fora da thread da interface e informa progresso periodicamente; ainda não há cancelamento. Não há build Windows aprovado nem instalador validado. A leitura direta de DWG/PDF/Office, visualizadores, versões imutáveis, busca FTS5, exportações completas e auditoria operacional ainda precisam ser implementadas.
 
 ## Próximas entregas
 
