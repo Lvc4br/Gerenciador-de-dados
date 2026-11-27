@@ -698,11 +698,11 @@ fn list_files(
 }
 
 fn extract_pdf_metadata_candidates(text: &str) -> Result<(Option<String>, Option<String>, Option<String>, f64), String> {
-    let drawing_pattern = regex::Regex::new(r"(?i)\\b([A-Z]{2,5})[-_ ]?(\\d{2,5})\\b")
+    let drawing_pattern = regex::Regex::new(r"(?i)\b([A-Z]{2,5})[-_ ]?(\d{2,5})\b")
         .map_err(|e| e.to_string())?;
-    let revision_pattern = regex::Regex::new(r"(?i)\\bREV(?:IS[ÃA]O)?[ .:_-]*([A-Z0-9]{1,4})\\b")
+    let revision_pattern = regex::Regex::new(r"(?i)\bREV(?:IS[ÃA]O)?[ .:_-]*([A-Z0-9]{1,4})\b")
         .map_err(|e| e.to_string())?;
-    let title_pattern = regex::Regex::new(r"(?im)^\\s*(?:T[IÍ]TULO|TITULO|DESCRI[CÇ][AÃ]O|NOME\\s+DO\\s+DESENHO)\\s*[:\\-]\\s*(.{5,180})\\s*$")
+    let title_pattern = regex::Regex::new(r"(?im)^\s*(?:T[IÍ]TULO|TITULO|DESCRI[CÇ][AÃ]O|NOME\s+DO\s+DESENHO)\s*[:\-]\s*(.{5,180})\s*$")
         .map_err(|e| e.to_string())?;
 
     let drawing_number = drawing_pattern.captures(text).and_then(|captures| {
