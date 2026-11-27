@@ -10,6 +10,12 @@ const sampleFiles = [
   { id: 6, filename: "Planilha_Custos.xlsx", relative_path: "Orcamento/Planilha_Custos.xlsx", extension: "xlsx", byte_size: 216880, modified_at: "2026-07-22T11:42:00Z", sha256: "f36f8f6d1a7b9d3e4c5f6a7b8c9d00112233445566778899aabbccddeeff0066", root_path: "C:\\Projetos\\AB20A", status: "indexed" }
 ];
 
+let sampleProjects = [
+  { id: 1, code: 'AB20A', name: 'Adequação da Ponte AB20A', client: 'ARTESP', description: 'Projeto demonstrativo de engenharia', status: 'active', root_count: 1, file_count: 6, created_at: '2026-11-01', updated_at: '2026-11-20' }
+];
+let nextProjectId = 2;
+const sampleRoots = [{ id: 1, path: 'C:\\\\Projetos\\\\AB20A', added_at: '2026-10-01', linked: false }];
+
 const sampleDiscrepancies = [
   { id: 1, filename: "AB20A-EST-001.dwg", branch: "Estruturas", number_in_filename: "EST-001", number_in_titleblock: "EST-010", revision: "02", extracted_title: "Planta de formas - tabuleiro", title_for_titleblock_number: "Detalhe de encontro", diagnosis: "Número divergente", artesp_number: "ART-001", internal_number: "EST-001", source_row: 2, source_csv: "divergencias_numero_carimbo.csv" },
   { id: 2, filename: "AB20A-DRE-014.dwg", branch: "Drenagem", number_in_filename: "DRE-014", number_in_titleblock: "DRE-014", revision: "01", extracted_title: "Detalhe de drenagem", title_for_titleblock_number: "Detalhe de drenagem", diagnosis: "Mesmo número e título", artesp_number: "ART-014", internal_number: "DRE-014", source_row: 3, source_csv: "divergencias_numero_carimbo.csv" },
@@ -20,6 +26,46 @@ export async function previewInvoke<T>(command: string, args: Record<string, unk
   await new Promise(resolve => setTimeout(resolve, 80));
   let result: unknown;
   switch (command) {
+    case "list_projects": {
+      const search = String(args.search ?? "").toLocaleLowerCase("pt-BR");
+      const status = String(args.status ?? "");
+      const filtered = sampleProjects.filter(p =>
+        (!search || [p.code,p.name,p.client].some(v => v.toLocaleLowerCase("pt-BR").includes(search))) &&
+        (!status || p.status === status)
+      );
+      const offset = Number(args.offset ?? 0), limit = Number(args.limit ?? 100);
+      result = { items: filtered.slice(offset, offset + limit), total: filtered.length };
+      break;
+    }
+    case "create_project": {
+      const code = String(args.code ?? "").trim().toUpperCase();
+      const name = String(args.name ?? "").trim();
+      if (!code || !name) throw new Error("Código e nome são obrigatórios.");
+      if (sampleProjects.some(p => p.code.toUpperCase() === code)) throw new Error("Já existe um projeto com esse código.");
+      const item = { id: nextProjectId++, code, name, client: String(args.client ?? ""), description: String(args.description ?? ""), status: "active", root_count: 0, file_count: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+      sampleProjects = [...sampleProjects, item];
+      result = item.id;
+      break;
+    }
+    case "update_project": {
+      const id = Number(args.id), code = String(args.code ?? "").trim().toUpperCase(), name = String(args.name ?? "").trim();
+      if (sampleProjects.some(p => p.id !== id && p.code.toUpperCase() === code)) throw new Error("Já existe outro projeto com esse código.");
+      sampleProjects = sampleProjects.map(p => p.id === id ? { ...p, code, name, client: String(args.client ?? ""), description: String(args.description ?? ""), updated_at: new Date().toISOString() } : p);
+      result = null;
+      break;
+    }
+    case "archive_project": {
+      const id = Number(args.id), status = args.archived ? "archived" : "active";
+      sampleProjects = sampleProjects.map(p => p.id === id ? { ...p, status } : p);
+      result = null;
+      break;
+    }
+    case "list_project_roots":
+      result = sampleRoots.map(root => ({ ...root, linked: false }));
+      break;
+    case "set_project_root_link":
+      result = null;
+      break;
     case "get_dashboard_stats":
       result = { root_count: 3, file_count: 1342, duplicate_hash_groups: 8, drawing_metadata_count: 1336, discrepancy_count: sampleDiscrepancies.length };
       break;
