@@ -19,7 +19,7 @@
 - Varredura recursiva, importação e indexação de pastas.
 - Hash SHA-256, deduplicação e preservação dos originais.
 - SQLite + FTS5 e migrações versionadas (baseline, índices de catálogo e índice textual já registrados).
-- Leitura de CSV, TXT e PDF textual.
+- Leitura de CSV e TXT no catálogo desktop; extração de PDF textual disponível inicialmente no motor Python/CLI, pendente integração ao desktop.
 - Explorer com árvore, lista/grade, breadcrumbs, ordenação, filtros e preview.
 - Busca e exportação CSV/XLSX.
 - Backup e restauração do catálogo.
@@ -50,6 +50,10 @@
 - Sugestões aceitas podem ser aplicadas explicitamente a `confirmed_document_metadata`; a operação registra valores anteriores/novos em `metadata_audit_log` e é idempotente para a mesma sugestão.
 - A aplicação não altera CSVs importados, não modifica o original e não cria vínculo automático de projeto.
 - Nenhum arquivo é aberto, renomeado, movido ou alterado por essa análise.
+- O módulo Python inicial de PDF usa `pypdf`, extrai texto por página offline e impõe limites de tamanho (200 MB), páginas (5.000) e caracteres (10 milhões); PDFs protegidos por senha são recusados sem tentativa de quebra.
+- O texto extraído é armazenado separado dos originais em `extracted_document_text` e indexado em FTS5 (`document_text_fts`); o CLI oferece `extract-pdf` e `search-content`.
+- Esta etapa é um protótipo do motor Python/CLI: ainda não está conectado ao backend Rust/Tauri nem à tela de pesquisa do desktop. PDFs digitalizados sem camada de texto exigem OCR, que não está incluído nesta etapa.
+
 - A comparação automatizada com os dados do carimbo e a aplicação controlada de valores aceitos permanecem etapas futuras.
 
 ## Fase 2 — Engenharia e divergências
