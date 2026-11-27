@@ -141,11 +141,90 @@ fn get_dashboard_stats(app: tauri::AppHandle) -> Result<DashboardStats, String> 
     Ok(DashboardStats { root_count, file_count, duplicate_hash_groups })
 }
 
+
+#[derive(Serialize)]
+struct FileRecord {
+    id: i64,
+    filename: String,
+    relative_path: String,
+    extension: String,
+    byte_size: i64,
+    modified_at: String,
+    sha256: String,
+    root_path: String,
+}
+
+#[derive(Serialize)]
+struct FilePage {
+    items: Vec<FileRecord>,
+    total: u64,
+}
+
+#[tauri::command]
+fn list_files(
+    app: tauri::AppHandle,
+    search: Option<String>,
+    extension: Option<String>,
+    sort_by: Option<String>,
+    ascending: Option<bool>,
+    limit: Option<u32>,
+    offset: Option<u32>,
+) -> Result<FilePage, String> {
+    let connection = open_database(&app)?;
+    let search = search.unwrap_or_default().trim().to_string();
+    let pattern = format!("%{}%", search.replace('%', "\\%").replace('_', "\\_"));
+    let extension = extension.unwrap_or_default().trim().trim_start_matches('.').to_lowercase();
+    let extension_filter = if extension.is_empty() { None } else { Some(extension) };
+
+    let total: u64 = connection.query_row(
+        "SELECT COUNT(*) FROM files f
+         WHERE (?1 = '' OR f.filename LIKE ?2 ESCAPE '\\' OR f.relative_path LIKE ?2 ESCAPE '\\')
+         AND (?3 IS NULL OR lower(f.extension) = ?3)",
+        params![search, pattern, extension_filter],
+        |row| row.get(0)
+    ).map_err(|e| e.to_string())?;
+
+    let order_column = match sort_by.as_deref() {
+        Some("filename") => "f.filename",
+        Some("extension") => "f.extension",
+        Some("size") => "f.byte_size",
+        Some("modified") => "f.modified_at",
+        _ => "f.relative_path",
+    };
+    let direction = if ascending.unwrap_or(true) { "ASC" } else { "DESC" };
+    let sql = format!(
+        "SELECT f.id, f.filename, f.relative_path, f.extension, f.byte_size,
+                f.modified_at, f.sha256, r.path
+         FROM files f JOIN scan_roots r ON r.id = f.root_id
+         WHERE (?1 = '' OR f.filename LIKE ?2 ESCAPE '\\' OR f.relative_path LIKE ?2 ESCAPE '\\')
+           AND (?3 IS NULL OR lower(f.extension) = ?3)
+         ORDER BY {order_column} {direction}
+         LIMIT ?4 OFFSET ?5"
+    );
+    let mut statement = connection.prepare(&sql).map_err(|e| e.to_string())?;
+    let rows = statement.query_map(
+        params![search, pattern, extension_filter, limit.unwrap_or(100).clamp(1, 500), offset.unwrap_or(0)],
+        |row| Ok(FileRecord {
+            id: row.get(0)?,
+            filename: row.get(1)?,
+            relative_path: row.get(2)?,
+            extension: row.get(3)?,
+            byte_size: row.get(4)?,
+            modified_at: row.get(5)?,
+            sha256: row.get(6)?,
+            root_path: row.get(7)?,
+        })
+    ).map_err(|e| e.to_string())?;
+    let mut items = Vec::new();
+    for row in rows { items.push(row.map_err(|e| e.to_string())?); }
+    Ok(FilePage { items, total })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![scan_folder, get_dashboard_stats])
+        .invoke_handler(tauri::generate_handler![scan_folder, get_dashboard_stats, list_files])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar o GED Desktop");
 }
