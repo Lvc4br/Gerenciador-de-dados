@@ -220,9 +220,9 @@ async fn scan_folder(app: tauri::AppHandle, folder: String) -> Result<ScanSummar
 fn get_dashboard_stats(app: tauri::AppHandle) -> Result<DashboardStats, String> {
     let connection = open_database(&app)?;
     let root_count = connection.query_row("SELECT COUNT(*) FROM scan_roots", [], |row| row.get(0)).map_err(|e| e.to_string())?;
-    let file_count = connection.query_row("SELECT COUNT(*) FROM files", [], |row| row.get(0)).map_err(|e| e.to_string())?;
+    let file_count = connection.query_row("SELECT COUNT(*) FROM files WHERE status='indexed'", [], |row| row.get(0)).map_err(|e| e.to_string())?;
     let duplicate_hash_groups = connection.query_row(
-        "SELECT COUNT(*) FROM (SELECT sha256 FROM files GROUP BY sha256 HAVING COUNT(*) > 1)",
+        "SELECT COUNT(*) FROM (SELECT sha256 FROM files WHERE status='indexed' GROUP BY sha256 HAVING COUNT(*) > 1)",
         [], |row| row.get(0)
     ).map_err(|e| e.to_string())?;
     let drawing_metadata_count = connection.query_row("SELECT COUNT(*) FROM drawing_metadata", [], |row| row.get(0)).map_err(|e| e.to_string())?;
