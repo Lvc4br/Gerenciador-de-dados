@@ -140,7 +140,7 @@ Não tratar hash igual como sinônimo de mesmo projeto. Hash igual significa con
 - Corrigir reconciliação de arquivos ausentes e erros de varredura.
 - Tornar indexação assíncrona com progresso/cancelamento.
 - Definir scanner único.
-- Criar migrações e backup SQLite.
+- Criar migrações SQLite versionadas; backup/restauração já implementados, faltando validação funcional e teste com bases maiores.
 - Corrigir importação CSV para substituir o conjunto de linhas da fonte sem deixar registros órfãos.
 
 **Critério de aceite:** pasta de teste indexada sem travar a interface; erros reportados; reindexação idempotente; remoções detectadas; banco recuperável por backup.
