@@ -119,15 +119,15 @@ A aceitação atual registra a decisão, mas não promove os campos para os meta
 A listagem de sugestões também consulta `drawing_metadata` por nome de arquivo e devolve `titleblock_internal_number`, `titleblock_artesp_number` e `titleblock_title` para conferência lado a lado. Quando não há correspondência importada, esses campos são nulos; isso não é tratado como divergência confirmada.
 
 
-## Extração inicial de PDF (motor Python/CLI)
+## Extração e pesquisa de conteúdo PDF no desktop
 
-O módulo `ged_indexer.pdf.extract_pdf_text(path)` extrai texto incorporado em PDFs usando `pypdf`, sem rede e sem modificar o documento. A dependência é opcional (`pip install -e '.[pdf]'`); está incluída no extra de testes do CI.
+O executável usa a biblioteca Rust `pdf-extract` no backend Tauri. A extração é executada em tarefa de background e não altera o arquivo original.
 
-Limites de proteção: 200 MB por arquivo, 5.000 páginas e 10 milhões de caracteres extraídos. PDFs criptografados sem senha são recusados. O extrator não executa OCR: arquivos digitalizados sem camada textual podem retornar texto vazio.
+- Comando Tauri `extract_pdf_text(fileId)`: localiza o documento indexado, exige status `indexed`, valida a extensão PDF, confere o SHA-256 do arquivo físico e só então extrai o texto.
+- Comando Tauri `extract_pending_pdf_text(limit)`: processa PDFs ainda não extraídos ou cujo hash mudou. A interface solicita lotes de até 50 documentos; o backend limita cada chamada a 200.
+- `list_files(searchInContent=true)`: quando habilitado, combina a busca de nome/caminho com os IDs encontrados em `document_text_fts`.
+- Migration 6 cria `extracted_document_text` e a tabela FTS5 externa `document_text_fts`, com triggers para manter inserções, atualizações e remoções sincronizadas.
+- Limites atuais: 200 MB por PDF e 10 milhões de caracteres extraídos. A checagem SHA-256 impede usar resultado de um arquivo que mudou após a última varredura.
+- PDFs sem texto selecionável são salvos com conteúdo vazio e sinalizados como `needs_ocr`; OCR não está incluído nesta etapa.
 
-Comandos:
-- `ged-indexer extract-pdf <file_id>`: localiza um PDF previamente catalogado, confere o SHA-256 atual contra a última varredura, extrai e salva o texto em `extracted_document_text`.
-- `ged-indexer extract-pdfs --limit 100`: processa em lote até 100 PDFs pendentes ou alterados; o limite permitido é de 1 a 500 por execução. Falhas individuais são reportadas sem interromper os demais arquivos.
-- `ged-indexer search-content "<termos>" --limit 50`: pesquisa o texto indexado pelo FTS5 e devolve caminho e trecho de contexto.
-
-A tabela `document_text_fts` é mantida por triggers quando o conteúdo extraído é inserido, atualizado ou removido. O texto é separado dos arquivos originais. Este fluxo ainda pertence ao banco do motor Python; a integração com o banco SQLite Rust/Tauri e com a busca na interface desktop é trabalho pendente, não devendo ser confundida com uma função já disponível no executável.
+O extrator Python `ged_indexer.pdf` e os comandos CLI documentados anteriormente permanecem experimentais e independentes. Eles não são utilizados pelo executável desktop, que usa o banco SQLite próprio do aplicativo.
