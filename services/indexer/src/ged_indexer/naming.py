@@ -5,7 +5,7 @@ from pathlib import Path
 
 # Conservative filename-only heuristics. Results are suggestions, never assignments.
 _DRAWING_NUMBER = re.compile(
-    r"(?:^|[-_.])(?P<discipline>(?!REV(?:ISION|ISAO)?[-_ .]?\\d)[A-Z]{2,5})[-_]?(?P<number>\d{2,5})(?=$|[-_.])"
+    r"(?:^|[-_.])(?P<discipline>(?!REV(?:ISION|ISAO)?[-_ .]?\d)[A-Z]{2,5})[-_]?(?P<number>\d{2,5})(?=$|[-_.])"
 )
 _REVISION = re.compile(
     r"(?:^|[-_.])(?:REV(?:ISION|ISAO)?[-_ .]?|R[-_ .]?)(?P<revision>\d{1,3}|[A-Z])(?=$|[-_.])"
