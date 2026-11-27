@@ -28,9 +28,9 @@ A arquitetura poderá evoluir para sincronização opcional com servidor corpora
 |---|---|
 | Aplicativo Windows | Tauri 2 + Rust |
 | Interface | React + TypeScript |
-| Processamento documental | Python empacotado como sidecar (PyInstaller), quando integrado |
+| Processamento documental | Rust no desktop; Python experimental para parsers e análise especializada |
 | Banco local | SQLite + FTS5 |
-| PDF | PDF.js |
+| Extração textual PDF | `pdf-extract` no backend Rust; PDF.js permanece opção para visualização |
 | OCR | Tesseract como primeira prova de conceito |
 | CSV/Office | Bibliotecas Python especializadas por formato |
 | CAD/BIM | Adaptadores isolados; validar SDK, versões e licenças |
@@ -89,19 +89,22 @@ A branch `feature/mvp-core-indexer` contém:
 - backup consistente do banco SQLite com verificação de integridade;
 - restauração de backup GED validado, criando uma cópia automática do banco atual antes da substituição;
 - indicadores de pastas, arquivos indexados e grupos de hashes duplicados;
-- Explorador conectado ao banco, com pesquisa por nome/caminho, filtro de extensão, ordenação, paginação e propriedades;
+- Explorador conectado ao banco, com pesquisa por nome/caminho e conteúdo PDF já extraído, filtro de extensão, ordenação, paginação e propriedades;
+- extração textual de PDF individual ou em lote no desktop, com verificação SHA-256, limites de tamanho/páginas/caracteres e armazenamento FTS5 no mesmo SQLite;
+- indicação de PDFs sem camada de texto, que exigirão OCR;
+- migrações 6 e 7 para texto extraído, índice de conteúdo e contagem de páginas;
 - importação dos dois esquemas CSV reconhecidos da amostra;
 - tela de consulta de divergências importadas, com origem e linha do CSV;
 - reimportação CSV transacional com savepoint, limpeza de linhas excedentes e reconciliação quando o esquema da fonte muda;
-- núcleo Python inicial e testes do scanner, ainda não integrado ao desktop como sidecar.
+- núcleo Python inicial para diagnóstico e parsers experimentais; o extrator Python de PDF não é usado pelo executável desktop.
 
-**Ainda não é uma versão pronta para uso ou distribuição.** O build Windows também recebeu uma correção para gerar o ícone ICO exigido pelo Tauri; a correção aguarda confirmação no CI. A varredura é executada fora da thread da interface e informa progresso periodicamente; ainda não há cancelamento. Não há build Windows aprovado nem instalador validado. A leitura direta de DWG/PDF/Office, visualizadores, armazenamento binário de versões antigas, busca FTS5 inicial para nome/caminho já foi integrada; filtros avançados, exportações completas e auditoria operacional ainda precisam ser implementados.
+**Ainda não é uma versão pronta para uso ou distribuição.** O build Windows também recebeu uma correção para gerar o ícone ICO exigido pelo Tauri; a correção aguarda confirmação no CI. A varredura é executada fora da thread da interface e informa progresso periodicamente; ainda não há cancelamento. Não há build Windows aprovado nem instalador validado. A leitura textual de PDF já está integrada ao desktop, mas não equivale a OCR nem a um visualizador. A leitura direta de DWG/Office, OCR, visualizadores, armazenamento binário de versões antigas, exportações completas e auditoria operacional ainda precisam ser implementados. A busca FTS5 por nome/caminho e pelo conteúdo PDF extraído está disponível no backend desktop.
 
 ## Próximas entregas
 
 1. Estabilizar varredura, erros, reconciliação e build Windows.
 2. Implementar migrações SQLite versionadas e validar backup/restauração em bases reais; armazenamento binário de versões continua pendente.
 3. Consolidar catálogo de projetos e busca FTS5.
-4. Implementar leitura de PDF/Office e visualização segura.
+4. Implementar OCR opcional para PDFs digitalizados, leitura de Office e visualização segura.
 5. Fazer prova de conceito DWG/DXF/IFC com validação de licença e compatibilidade.
 6. Implementar comparação, recomendações explicáveis e exportação com evidências.
