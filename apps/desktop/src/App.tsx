@@ -67,8 +67,9 @@ function ExplorerPanel() {
         search, extension, sortBy, ascending, limit: pageSize, offset: page * pageSize
       });
       setData(result);
-      setSelected(current => current && result.items.some(item => item.id === current.id)
-        ? current : (result.items[0] ?? null));
+      setSelected(current => current
+        ? (result.items.find(item => item.id === current.id) ?? result.items[0] ?? null)
+        : (result.items[0] ?? null));
     } catch (reason) { setError(String(reason)); }
     finally { setLoading(false); }
   }
@@ -77,14 +78,14 @@ function ExplorerPanel() {
 
   useEffect(() => {
     let active = true;
-    if (!selected) { setVersions([]); return; }
+    if (!selected) { setVersions([]); setLoadingVersions(false); return; }
     setLoadingVersions(true);
     invoke<FileVersion[]>('list_file_versions', { fileId: selected.id })
       .then(result => { if (active) setVersions(result); })
       .catch(() => { if (active) setVersions([]); })
       .finally(() => { if (active) setLoadingVersions(false); });
     return () => { active = false; };
-  }, [selected?.id]);
+  }, [selected?.id, selected?.sha256]);
 
   const totalPages = Math.max(1, Math.ceil(data.total / pageSize));
   return (
