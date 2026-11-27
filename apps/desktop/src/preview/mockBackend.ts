@@ -199,6 +199,7 @@ export async function previewInvoke<T>(command: string, args: Record<string, unk
     case "apply_accepted_filename_suggestion": {
       const item = sampleFilenameSuggestions.find(value => value.id === Number(args.id));
       if (!item || item.status !== "accepted") throw new Error("Somente sugestões aceitas podem ser aplicadas.");
+      sampleFilenameSuggestions = sampleFilenameSuggestions.map(value => value.id === item.id ? { ...value, applied: true } : value);
       result = null;
       break;
     }
