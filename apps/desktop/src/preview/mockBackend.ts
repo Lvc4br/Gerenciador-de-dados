@@ -187,15 +187,21 @@ export async function previewInvoke<T>(command: string, args: Record<string, unk
       const fileId = Number(args.fileId);
       const file = sampleFiles.find(item => item.id === fileId);
       if (!file || file.extension !== "pdf") throw new Error("Selecione um PDF válido.");
-      samplePdfText[fileId] = "Projeto AB20A. Desenho EST-001. Revisão 02. Planta de formas do tabuleiro e estrutura de concreto.";
-      result = { file_id: fileId, character_count: samplePdfText[fileId].length, page_count: 2, pages_with_text: 2, needs_ocr: false, parser_version: "preview-mock" };
+      samplePdfText[fileId] = "Projeto AB20A. Desenho EST-001. Revisão 02. Título: Planta de formas do tabuleiro e estrutura de concreto.";
+      sampleFilenameSuggestions = sampleFilenameSuggestions.map(item => item.file_id === fileId
+        ? { ...item, pdf_drawing_number: "EST-001", pdf_revision: "02", pdf_title: "Planta de formas do tabuleiro", pdf_confidence: 0.86 }
+        : item);
+      result = { file_id: fileId, character_count: samplePdfText[fileId].length, page_count: 2, pages_with_text: 2, needs_ocr: false, drawing_number: "EST-001", revision: "02", candidate_title: "Planta de formas do tabuleiro", metadata_confidence: 0.86, parser_version: "preview-mock" };
       break;
     }
     case "extract_pending_pdf_text": {
       let processed = 0;
       for (const file of sampleFiles.filter(item => item.extension === "pdf").slice(0, Number(args.limit ?? 50))) {
         if (!samplePdfText[file.id]) {
-          samplePdfText[file.id] = "Projeto AB20A. Desenho EST-001. Revisão 02. Planta de formas do tabuleiro e estrutura de concreto.";
+          samplePdfText[file.id] = "Projeto AB20A. Desenho EST-001. Revisão 02. Título: Planta de formas do tabuleiro e estrutura de concreto.";
+          sampleFilenameSuggestions = sampleFilenameSuggestions.map(item => item.file_id === file.id
+            ? { ...item, pdf_drawing_number: "EST-001", pdf_revision: "02", pdf_title: "Planta de formas do tabuleiro", pdf_confidence: 0.86 }
+            : item);
           processed += 1;
         }
       }
