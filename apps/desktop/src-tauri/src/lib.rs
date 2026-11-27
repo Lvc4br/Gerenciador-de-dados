@@ -625,7 +625,7 @@ fn list_files(
                AND p.client LIKE ?8 ESCAPE '\\'
            ))
          ORDER BY {order_column} {direction}
-         LIMIT ?9 OFFSET ?10"
+         LIMIT ?10 OFFSET ?11"
     );
     let mut statement = connection.prepare(&sql).map_err(|e| e.to_string())?;
     let rows = statement.query_map(
