@@ -196,6 +196,12 @@ export async function previewInvoke<T>(command: string, args: Record<string, unk
       result = { items: filtered.slice(offset, offset + limit), total: filtered.length };
       break;
     }
+    case "apply_accepted_filename_suggestion": {
+      const item = sampleFilenameSuggestions.find(value => value.id === Number(args.id));
+      if (!item || item.status !== "accepted") throw new Error("Somente sugestões aceitas podem ser aplicadas.");
+      result = null;
+      break;
+    }
     case "review_filename_suggestion": {
       const id = Number(args.id), decision = String(args.decision);
       if (decision !== "accepted" && decision !== "rejected") throw new Error("Decisão inválida.");
