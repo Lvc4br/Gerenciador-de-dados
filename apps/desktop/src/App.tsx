@@ -73,6 +73,9 @@ function ExplorerPanel() {
   const [targetProjectId, setTargetProjectId] = useState('');
   const [linkNotice, setLinkNotice] = useState('');
   const [linking, setLinking] = useState(false);
+  const [searchInContent, setSearchInContent] = useState(false);
+  const [extractingPdf, setExtractingPdf] = useState(false);
+  const [contentNotice, setContentNotice] = useState('');
   const pageSize = 100;
 
   useEffect(() => {
@@ -112,7 +115,7 @@ function ExplorerPanel() {
         search, extension, client: clientFilter,
         projectId: projectFilter ? Number(projectFilter) : null,
         disciplineId: disciplineFilter ? Number(disciplineFilter) : null,
-        sortBy, ascending, limit: pageSize, offset: page * pageSize
+        sortBy, ascending, searchInContent, limit: pageSize, offset: page * pageSize
       });
       setData(result);
       setSelected(current => current
@@ -122,7 +125,7 @@ function ExplorerPanel() {
     finally { setLoading(false); }
   }
 
-  useEffect(() => { void loadFiles(); }, [search, extension, clientFilter, projectFilter, disciplineFilter, sortBy, ascending, page]);
+  useEffect(() => { void loadFiles(); }, [search, extension, clientFilter, projectFilter, disciplineFilter, sortBy, ascending, searchInContent, page]);
 
   useEffect(() => {
     let active = true;
@@ -144,6 +147,9 @@ function ExplorerPanel() {
       </div>
       <div className="explorer-toolbar">
         <label className="explorer-search"><Search size={16} /><input value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Nome do arquivo ou caminho..." /></label>
+        <button className={searchInContent ? 'sort-button active' : 'sort-button'} onClick={() => { setSearchInContent(value => !value); setPage(0); }} title="Inclui o texto já extraído de PDFs na pesquisa">
+          <FileSearch size={15} /> {searchInContent ? 'Conteúdo PDF ligado' : 'Pesquisar conteúdo PDF'}
+        </button>
         <label className="filter-control"><span>Cliente</span><input value={clientFilter} onChange={e => { setClientFilter(e.target.value); setPage(0); }} placeholder="Nome do cliente" /></label>
         <label className="filter-control"><span>Projeto</span><select value={projectFilter} onChange={e => { setProjectFilter(e.target.value); setPage(0); }}><option value="">Todos</option>{projectOptions.map(project => <option key={project.id} value={project.id}>{project.code} — {project.name}</option>)}</select></label>
         <label className="filter-control"><span>Disciplina</span><select value={disciplineFilter} onChange={e => { setDisciplineFilter(e.target.value); setPage(0); }} disabled={!projectFilter}><option value="">Todas</option>{disciplineOptions.map(d => <option key={d.id} value={d.id}>{d.code} — {d.name}</option>)}</select></label>
@@ -179,6 +185,24 @@ function ExplorerPanel() {
             <div className="detail-row"><span>Tamanho</span><b>{formatBytes(selected.byte_size)}</b></div>
             <div className="detail-row"><span>Modificado</span><b>{formatDate(selected.modified_at, true)}</b></div>
             <div className="detail-row hash-row"><span>SHA-256 atual</span><code>{selected.sha256}</code></div>
+            {selected.extension.toLowerCase() === 'pdf' && <div className="project-link-box">
+              <b>Conteúdo do PDF</b>
+              <button className="secondary-button" disabled={extractingPdf || selected.status !== 'indexed'} onClick={async () => {
+                setExtractingPdf(true); setContentNotice(''); setError('');
+                try {
+                  const result = await invoke<{character_count:number;needs_ocr:boolean}>('extract_pdf_text', { fileId: selected.id });
+                  setContentNotice(result.needs_ocr
+                    ? 'PDF sem texto selecionável. Será necessário OCR para pesquisar o conteúdo.'
+                    : 'Texto extraído: ' + result.character_count.toLocaleString('pt-BR') + ' caracteres. A pesquisa por conteúdo já pode ser utilizada.');
+                  if (!result.needs_ocr) setSearchInContent(true);
+                } catch (reason) { setError(String(reason)); }
+                finally { setExtractingPdf(false); }
+              }}>
+                {extractingPdf ? 'Extraindo texto...' : 'Extrair texto deste PDF'}
+              </button>
+              {contentNotice && <small role="status">{contentNotice}</small>}
+              <small>O arquivo original não é alterado. PDFs digitalizados precisam de OCR.</small>
+            </div>}
             <div className="project-link-box">
               <b>Adicionar a um projeto</b>
               <select value={targetProjectId} onChange={event => setTargetProjectId(event.target.value)}>
