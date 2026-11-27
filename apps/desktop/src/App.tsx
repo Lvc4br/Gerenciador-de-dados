@@ -564,7 +564,7 @@ function ReviewPanel() {
   return (
     <section className="explorer">
       <div className="page-heading explorer-heading">
-        <div><div className="eyebrow">IDENTIFICAÇÃO ASSISTIDA</div><h1>Revisão de documentos</h1><p>Confira as informações sugeridas pelo nome do arquivo antes de utilizá-las no cadastro do projeto.</p></div>
+        <div><div className="eyebrow">IDENTIFICAÇÃO ASSISTIDA</div><h1>Revisão de documentos</h1><p>Confira as informações sugeridas pelo nome e pelo conteúdo dos PDFs antes de utilizá-las no cadastro do projeto.</p></div>
         <button className="secondary-button" onClick={() => void loadSuggestions()} disabled={loading}><RefreshCw size={15} /> Atualizar</button>
       </div>
       <div className="explorer-toolbar">
@@ -597,6 +597,9 @@ function ReviewPanel() {
               {item.pdf_drawing_number && item.drawing_number &&
                 item.pdf_drawing_number.toUpperCase() !== item.drawing_number.toUpperCase() &&
                 <div className="metadata-warning">O número sugerido pelo PDF difere do número identificado no nome. Confira as evidências antes de confirmar.</div>}
+              {item.pdf_revision && item.revision &&
+                item.pdf_revision.toUpperCase() !== item.revision.toUpperCase() &&
+                <div className="metadata-warning">A revisão sugerida pelo PDF difere da revisão identificada no nome. Confira as evidências antes de confirmar.</div>}
               {!item.pdf_drawing_number && <div className="metadata-hint">Para analisar o conteúdo, extraia o texto deste PDF no Explorador.</div>}
             </div>}
             {item.status === "pending" && <div className="dashboard-actions review-actions">
