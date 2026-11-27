@@ -81,7 +81,13 @@ pub fn import_metadata_csv(
         "revisao", "titulo_extraido", "titulo_do_numero_do_carimbo", "diagnostico"
     ].iter().all(|name| headers.contains_key(*name));
 
-    if !is_title_metadata && !is_discrepancy { return Ok(0); }
+    if !is_title_metadata && !is_discrepancy {
+        connection.execute("DELETE FROM drawing_metadata WHERE source_file_id=?1", params![source_file_id])
+            .map_err(|e| e.to_string())?;
+        connection.execute("DELETE FROM drawing_discrepancies WHERE source_file_id=?1", params![source_file_id])
+            .map_err(|e| e.to_string())?;
+        return Ok(0);
+    }
 
     let mut imported = 0usize;
     for (index, result) in reader.records().enumerate() {
@@ -142,6 +148,21 @@ pub fn import_metadata_csv(
             ).map_err(|e| e.to_string())?;
         }
         imported += 1;
+    }
+
+    // A successful full import is authoritative for this source file.
+    // Remove rows left behind when the CSV has fewer data records than before.
+    let last_source_row = (imported + 1) as i64;
+    if is_discrepancy {
+        connection.execute(
+            "DELETE FROM drawing_discrepancies WHERE source_file_id=?1 AND source_row>?2",
+            params![source_file_id, last_source_row]
+        ).map_err(|e| e.to_string())?;
+    } else {
+        connection.execute(
+            "DELETE FROM drawing_metadata WHERE source_file_id=?1 AND source_row>?2",
+            params![source_file_id, last_source_row]
+        ).map_err(|e| e.to_string())?;
     }
     Ok(imported)
 }
