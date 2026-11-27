@@ -22,3 +22,4 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 csv = "1"
 pdf-extract = "0.12.1"
+regex = "1"
