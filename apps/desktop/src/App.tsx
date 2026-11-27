@@ -64,7 +64,33 @@ function ExplorerPanel() {
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [projectOptions, setProjectOptions] = useState<Array<{id:number;code:string;name:string}>>([]);
+  const [targetProjectId, setTargetProjectId] = useState('');
+  const [linkNotice, setLinkNotice] = useState('');
+  const [linking, setLinking] = useState(false);
   const pageSize = 100;
+
+  useEffect(() => {
+    invoke<{items:Array<{id:number;code:string;name:string}>}>('list_projects', { search: '', status: 'active', limit: 500, offset: 0 })
+      .then(result => {
+        setProjectOptions(result.items);
+        setTargetProjectId(current => current || (result.items[0] ? String(result.items[0].id) : ''));
+      })
+      .catch(() => setProjectOptions([]));
+  }, []);
+
+  async function linkSelectedFile() {
+    if (!selected || !targetProjectId) return;
+    setLinking(true); setLinkNotice(''); setError('');
+    try {
+      await invoke<void>('set_project_file_link', {
+        projectId: Number(targetProjectId), fileId: selected.id, linked: true, disciplineId: null
+      });
+      const project = projectOptions.find(item => item.id === Number(targetProjectId));
+      setLinkNotice(project ? selected.filename + ' foi associado ao projeto ' + project.code + '.' : 'Documento associado ao projeto.');
+    } catch (reason) { setError(String(reason)); }
+    finally { setLinking(false); }
+  }
 
   async function loadFiles() {
     setLoading(true); setError('');
@@ -134,6 +160,18 @@ function ExplorerPanel() {
             <div className="detail-row"><span>Tamanho</span><b>{formatBytes(selected.byte_size)}</b></div>
             <div className="detail-row"><span>Modificado</span><b>{formatDate(selected.modified_at, true)}</b></div>
             <div className="detail-row hash-row"><span>SHA-256 atual</span><code>{selected.sha256}</code></div>
+            <div className="project-link-box">
+              <b>Adicionar a um projeto</b>
+              <select value={targetProjectId} onChange={event => setTargetProjectId(event.target.value)}>
+                <option value="">Selecione um projeto...</option>
+                {projectOptions.map(project => <option key={project.id} value={project.id}>{project.code} — {project.name}</option>)}
+              </select>
+              <button className="secondary-button" disabled={!targetProjectId || linking || selected.status !== 'indexed'} onClick={() => void linkSelectedFile()}>
+                {linking ? 'Associando...' : 'Vincular documento'}
+              </button>
+              {linkNotice && <small role="status">{linkNotice}</small>}
+              {projectOptions.length === 0 && <small>Cadastre um projeto antes de associar documentos.</small>}
+            </div>
             <div className="version-history">
               <div className="details-heading"><Clock3 size={16} /><b>Histórico de versões</b><span>{loadingVersions ? 'Carregando...' : versions.length}</span></div>
               {versions.length === 0 && !loadingVersions && <p className="detail-note">Nenhuma versão registrada. Execute uma nova indexação para registrar o conteúdo atual.</p>}
