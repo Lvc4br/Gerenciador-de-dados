@@ -5,16 +5,16 @@
 **Plataforma definida:** Windows 10 ou superior, x64.  
 **Uso inicial:** um engenheiro, um computador, operação local/offline.
 
-> Esta é uma auditoria estática do estado do repositório. Não equivale a teste funcional em Windows, teste de carga, análise de segurança independente ou validação dos formatos CAD/BIM. A execução de CI consultada aprovou os testes Python e o build frontend, mas falhou no build nativo porque `icons/icon.ico` não existia. O `build.rs` foi corrigido para gerar o ícone; essa correção ainda aguarda uma nova confirmação de CI.
+> Esta é uma auditoria estática do estado do repositório. Não equivale a teste funcional em Windows, teste de carga, análise de segurança independente ou validação dos formatos CAD/BIM. Na última consulta, os workflows para o SHA mais recente ainda estavam na fila. Execuções anteriores identificaram e permitiram corrigir um teste FTS Python e uma quebra de sintaxe em `suggestions.rs`; portanto, não declarar CI verde até que o workflow do SHA atual termine.
 
 ## 1. Parecer executivo
 
-A direção tecnológica é adequada para um executável desktop Windows: Tauri 2 + React + TypeScript + Rust, com SQLite local. Python pode ser mantido para extração documental, OCR, classificação e adaptadores que tenham ecossistema melhor nessa linguagem.
+A direção tecnológica é adequada para um executável desktop Windows: Tauri 2 + React + TypeScript + Rust, com SQLite local. A extração textual de PDF já está integrada no backend Rust/Tauri com `pdf-extract`; Python permanece como motor experimental independente para parsers/diagnósticos e não está empacotado como sidecar.
 
 O principal ajuste arquitetural recomendado é separar claramente as responsabilidades:
 - **Rust/Tauri:** ciclo de vida desktop, permissões, acesso ao sistema de arquivos, comandos locais e operações rápidas.
 - **React/TypeScript:** interface, navegação, tabelas, filtros, formulários e visualizadores web.
-- **Python sidecar:** extração de conteúdo, OCR, parsing de formatos e regras de análise mais complexas, executados em jobs isolados.
+- **Python experimental:** protótipos de parsing e diagnóstico; uma futura integração como sidecar exigirá protocolo IPC, empacotamento e testes próprios.
 - **SQLite:** catálogo local, metadados, estados dos jobs, auditoria e pesquisa textual FTS5.
 - **Arquivos originais:** permanecem intactos nos caminhos escolhidos pelo usuário; previews e caches ficam em diretório próprio do GED.
 
@@ -30,22 +30,27 @@ O principal ajuste arquitetural recomendado é separar claramente as responsabil
 - Hash SHA-256 calculado em blocos.
 - Registro de caminho relativo, nome, extensão, tamanho e data de modificação.
 - Detecção de grupos de hashes iguais.
-- Explorador com pesquisa por nome/caminho, filtro por extensão, ordenação e paginação.
+- Explorador com pesquisa FTS5 por nome/caminho, filtro por extensão, ordenação, paginação e filtros por cliente/projeto/disciplina.
+- Catálogo de projetos com associação reutilizável de pastas, disciplinas e vínculos individuais de documentos.
+- Sugestões conservadoras de projeto, disciplina, número e revisão a partir do nome do arquivo, com revisão humana e aplicação auditada.
+- Extração textual de PDFs no backend Rust/Tauri, com limites, validação SHA-256, execução em background, extração em lote e índice FTS5 no SQLite desktop.
+- Pesquisa opcional no conteúdo PDF, com trechos de contexto nos resultados do Explorador.
+- Extração preliminar de número de desenho, revisão e título do texto PDF, apresentada na tela Revisão ao lado de dados importados do carimbo.
 - Importação de dois esquemas CSV reconhecidos: metadados de desenhos e relatório de divergências.
 - Tela para consultar divergências importadas, preservando arquivo CSV de origem e número da linha.
-- Núcleo Python separado com scanner e testes iniciais.
+- Núcleo Python separado com scanner e protótipo de extração PDF via CLI; não é usado pelo executável desktop.
 
 ### Ainda não comprovado ou não implementado
 - Não foi comprovado build bem-sucedido em Windows 10/11.
 - Não há instalador executável validado para distribuição.
 - O núcleo Python não está conectado como sidecar ao aplicativo Tauri; a varredura atual da aplicação é feita em Rust.
-- Não há leitura direta do conteúdo DWG, PDF ou Office no fluxo do desktop.
+- Não há leitura direta de conteúdo DWG ou Office no desktop. A leitura textual de PDF está integrada; OCR ainda não.
 - Não há visualizador de documentos integrado.
 - Há histórico de fingerprints SHA-256 distintos por arquivo, com tamanho e datas; ainda não há cópias binárias para restauração.
-- Não há busca textual FTS5, apesar de prevista na arquitetura.
-- Não há módulo funcional de cadastro de projetos, exportações ou configurações; partes da navegação ainda são placeholders.
+- FTS5 existe para nome/caminho e conteúdo PDF já extraído; ainda não há indexação textual de Office/DWG.
+- O catálogo de projetos e disciplinas está implementado; exportações completas e configurações avançadas continuam pendentes.
 - Não há trilha de auditoria operacional completa.
-- Os testes Python cobrem o scanner, mas não cobrem o fluxo Tauri/Rust, importação CSV, banco SQLite desktop ou interface.
+- Há testes Python para scanner, parser de nomes e protótipo PDF; testes Rust cobrem FTS, backup e parser PDF. Ainda faltam testes de ponta a ponta com banco desktop legado, UI e instalador.
 
 ## 3. Correções iniciadas após a auditoria
 
@@ -62,6 +67,11 @@ Na continuação da Fase 0, foram adicionadas à branch:
 - Varredura movida para `spawn_blocking`, evitando executar o hash pesado na thread de UI, com eventos periódicos de progresso para a interface.
 - Contadores do dashboard e grupos de duplicidade consideram somente arquivos atualmente indexados.
 - Reimportação CSV remove linhas antigas excedentes, limpa os dados do tipo anterior quando o esquema da fonte muda e usa savepoint para rollback integral em falhas.
+- Migrações SQLite 6, 7 e 8 adicionam texto extraído, índice FTS5, contagem de páginas e candidatos de número/revisão/título do PDF.
+- O Explorador oferece extração individual e em lotes de até 50 PDFs pela interface, mostra o estado da extração e retorna trechos de contexto quando a busca por conteúdo está ativa.
+- O parser PDF confere o hash atual antes de usar o documento, limita tamanho a 200 MB, páginas a 5.000 e texto a 10 milhões de caracteres; PDFs sem camada textual são marcados para futura etapa de OCR.
+- Sugestões vindas do conteúdo PDF são mantidas separadas dos metadados confirmados e exigem revisão humana; a comparação com o nome é preliminar, não uma validação de engenharia.
+
 
 **Limitações ainda abertas:** ainda não há cancelamento da varredura; o histórico atual não armazena cópias binárias, então não permite restaurar versões individuais de documentos. Backup e restauração do banco foram implementados; há teste unitário do mecanismo de cópia, mas ainda faltam teste funcional de ponta a ponta em Windows e teste com bancos maiores. As alterações aguardam confirmação do CI Windows.
 
@@ -76,10 +86,10 @@ Na continuação da Fase 0, foram adicionadas à branch:
 | **Alta** | O mesmo scanner existe em Rust e Python, mas só o Rust está ligado ao app | Duas implementações podem divergir e gerar resultados diferentes | Definir um único scanner oficial. Recomendação: Rust para indexação local; Python apenas para parsing/análise |
 | **Alta — parcial** | Reindexação atualiza os metadados atuais; histórico guarda SHA-256, tamanho e datas, mas não o binário | É possível provar que o conteúdo mudou, mas não restaurar uma versão antiga | Adicionar armazenamento de conteúdo versionado ou snapshot com política de retenção e backup |
 | **Resolvido na branch** | Reimportação CSV podia manter linhas antigas e dados de esquema anterior | A tela podia exibir ocorrências obsoletas | Savepoint, remoção de linhas excedentes e limpeza ao mudar o tipo de esquema |
-| **Média** | Busca do Explorer usa LIKE; FTS5 não foi criado | Busca em grandes catálogos ficará limitada e menos relevante | Criar índice FTS5 para nome, título, identificadores e texto extraído; manter filtros estruturados em SQL |
+| **Resolvido parcialmente** | FTS5 indexa nome/caminho e texto PDF extraído | Office/DWG e outros formatos ainda não entram na busca por conteúdo | Expandir parsers de formato sem duplicar conteúdo e manter limites por arquivo |
 | **Média** | Erros de importação CSV são somados ao contador genérico de indexação | O usuário não sabe se falhou o hash, a leitura ou a interpretação do CSV | Separar erros de acesso, hash, formato e extração; exibir relatório por arquivo |
 | **Média** | Interface contém ações e módulos ainda sem comportamento | Pode induzir o usuário a esperar funcionalidades inexistentes | Ocultar/desabilitar ações não entregues e mostrar claramente “em desenvolvimento” |
-| **Média — parcial** | Migrações SQLite ainda não estão versionadas; backup/restauração foram adicionados | Mudanças futuras de schema podem ficar frágeis, embora exista recuperação do banco | Adotar tabela `schema_migrations` e validar rotina de backup/restauração em cenários reais |
+| **Parcial** | Migrações SQLite versionadas e backup/restauração existem | Falta validar upgrade de bancos reais antigos e restauração em Windows limpo | Criar fixtures de bancos legados e smoke tests de backup/restauração em Windows |
 | **Média** | Testes automatizados não cobrem Rust/CSV/integração/UI | Regressões podem chegar ao usuário | Criar testes unitários Rust, fixtures CSV reais anonimizadas, testes de migração e smoke test do instalador |
 | **Média** | Dependências e formatos CAD/BIM ainda não passaram por validação de licença/versão | Risco de custo, incompatibilidade ou restrição de distribuição | Fazer prova de conceito isolada para cada formato e registrar matriz de compatibilidade/licenças |
 
@@ -91,9 +101,9 @@ Na continuação da Fase 0, foram adicionadas à branch:
 | Interface | **React + TypeScript** | Componentização, tipagem, ecossistema de tabelas, formulários e visualizadores |
 | Estilo | CSS modular ou Tailwind (escolher um padrão) | Evitar misturar estratégias de estilo sem necessidade |
 | Banco local | **SQLite + FTS5** | Sem servidor, simples de distribuir, transações e busca textual local |
-| Extração documental | **Python 3.12+** | Ecossistema amplo de OCR, PDF, Office, dados e processamento de documentos |
+| Extração PDF textual no desktop | **Rust `pdf-extract`** | Integrado ao backend e ao SQLite do aplicativo, sem sidecar Python |
 | Empacotamento Python | **PyInstaller**, se o sidecar for necessário | Permite distribuir o motor sem exigir Python instalado; o build Windows deve ser feito em Windows |
-| PDF | PDF.js | Renderização e seleção de texto no frontend; validar documentos grandes e PDFs digitalizados |
+| Visualização PDF | PDF.js (futuro) | A extração textual já usa `pdf-extract`; visualização é uma capacidade separada |
 | OCR | Tesseract como opção local inicial; avaliar PaddleOCR apenas se a qualidade justificar | OCR offline; comparar precisão em carimbos, desenhos e tabelas reais |
 | CSV/XLSX/DOCX/PPTX | bibliotecas Python especializadas por formato | Extração controlada, com testes por versão e amostras reais |
 | DWG/DXF | prova de conceito com SDK/biblioteca compatível e licença validada | DWG é o maior risco de compatibilidade/licenciamento; não escolher biblioteca só por ser gratuita |
@@ -104,7 +114,7 @@ Na continuação da Fase 0, foram adicionadas à branch:
 
 ### Decisão sobre Python
 
-Não mover tudo para Python. O Rust já está integrado ao Tauri e é adequado para operações de sistema. Python deve entrar quando houver uma tarefa de extração ou análise que justifique seu ecossistema. O sidecar precisa ter protocolo IPC local restrito, versão/health check, timeout, cancelamento e limites de memória; não deve abrir uma API de rede acessível na LAN.
+Não mover tudo para Python. O Rust já está integrado ao Tauri e executa indexação, operações locais e extração textual de PDF. O pacote Python atual é experimental e independente; não está empacotado nem conectado ao executável. Um sidecar futuro só deve ser criado quando OCR/Office ou outro parser justificar o custo, com IPC local restrito, versão/health check, timeout, cancelamento e limites de memória.
 
 ## 6. Modelo de dados que recomendo consolidar
 
@@ -156,10 +166,10 @@ Não tratar hash igual como sinônimo de mesmo projeto. Hash igual significa con
 **Critério de aceite:** pesquisar por código, título, ramo, rodovia, trecho e revisão; localizar a origem de cada dado; preservar versões anteriores.
 
 ### Fase 2 — leitura documental
-- PDF pesquisável e PDF digitalizado com OCR.
+- OCR opcional para PDFs digitalizados; a extração textual de PDFs pesquisáveis já está integrada.
 - Extração de propriedades e texto de Office.
 - Preview seguro e cache local.
-- Fila de processamento e reprocessamento.
+- Fila de processamento, cancelamento e reprocessamento.
 
 **Critério de aceite:** cada campo extraído informa origem, método, versão do extrator e possibilidade de revisão.
 
@@ -209,7 +219,7 @@ Não tratar hash igual como sinônimo de mesmo projeto. Hash igual significa con
 
 ## 11. Conclusão
 
-A stack atual deve ser mantida, com uma decisão arquitetural clara: **Rust é o núcleo desktop e de indexação local; Python é o motor de extração/análise; React/TypeScript é a interface; SQLite é o banco embarcado**.
+A stack atual deve ser mantida, com uma decisão arquitetural clara: **Rust é o núcleo desktop, indexação local e extração textual PDF; React/TypeScript é a interface; SQLite é o banco embarcado; Python é experimental e poderá ser integrado como sidecar quando houver justificativa técnica**.
 
 O maior risco neste momento não é escolher outra linguagem. É ampliar funcionalidades antes de estabilizar indexação, versões, proveniência, recuperação de dados, testes Windows e compatibilidade/licenças CAD. A próxima entrega deve priorizar a Fase 0, antes de começar OCR ou comparação DWG.
 
@@ -223,3 +233,10 @@ O maior risco neste momento não é escolher outra linguagem. É ampliar funcion
 - Não há ainda teste funcional de migração com banco legado real nem execução confirmada do CI para este commit.
 
 - A pesquisa do Explorador passou a usar FTS5 para termos com pelo menos dois caracteres; consultas curtas mantêm fallback LIKE para preservar a busca simples.
+
+
+## 12. Estado de consolidação — 27/11/2026
+
+**Entregue na branch:** catálogo de projetos, associação de pastas/documentos, sugestões pelo nome, aplicação auditada de metadados aceitos, extração textual PDF integrada ao backend desktop, pesquisa FTS5 por conteúdo, trechos de contexto, candidatos de número/revisão/título extraídos do PDF e comparação preliminar na tela Revisão.
+
+**Ainda não considerar pronto para distribuição:** CI do SHA mais recente, instalador Windows, teste em máquina limpa, OCR, Office, leitura DWG/IFC, visualizador PDF e cópias binárias de versões antigas ainda precisam ser validados ou implementados. O executável não deve ser apresentado como biblioteca de engenharia pronta até cumprir esses critérios.
