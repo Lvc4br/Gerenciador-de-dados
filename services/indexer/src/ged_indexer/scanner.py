@@ -36,7 +36,7 @@ def scan_folder(
     ).fetchone()
     root_id = int(row["id"])
 
-    indexed = skipped = errors = 0
+    indexed = skipped = errors = suggestions_count = 0
     for current, dirs, filenames in os.walk(root, followlinks=False):
         current_path = Path(current)
         dirs[:] = [
@@ -83,6 +83,8 @@ def scan_folder(
                     (root_id, relative),
                 ).fetchone()
                 suggestion = extract_filename_metadata(filename)
+                if any(suggestion[key] for key in ("project_prefix", "discipline_code", "drawing_number", "revision")):
+                    suggestions_count += 1
                 connection.execute(
                     """
                     INSERT INTO filename_suggestions(
@@ -132,5 +134,6 @@ def scan_folder(
         "indexed": indexed,
         "skipped": skipped,
         "errors": errors,
+        "filename_suggestions": suggestions_count,
         "duplicate_hash_groups": int(duplicates),
     }
