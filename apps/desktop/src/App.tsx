@@ -482,7 +482,7 @@ type FilenameSuggestion = {
   id: number; file_id: number; filename: string; relative_path: string;
   project_prefix: string | null; discipline_code: string | null;
   drawing_number: string | null; revision: string | null;
-  confidence: number; status: "pending" | "accepted" | "rejected"; created_at: string;
+  confidence: number; status: "pending" | "accepted" | "rejected"; applied: boolean; created_at: string;
 };
 type SuggestionPage = { items: FilenameSuggestion[]; total: number };
 
@@ -547,7 +547,7 @@ function ReviewPanel() {
               <button className="secondary-button" disabled={busyId === item.id} onClick={() => void review(item, "rejected")}>Rejeitar</button>
               <button className="primary-button" disabled={busyId === item.id} onClick={() => void review(item, "accepted")}>{busyId === item.id ? "Salvando..." : "Aceitar sugestão"}</button>
             </div>}
-            {item.status === "accepted" && <div className="dashboard-actions review-actions">
+            {item.status === "accepted" && (item.applied ? <div className="dashboard-actions review-actions"><span className="file-status indexed">Metadados aplicados</span></div> : <div className="dashboard-actions review-actions">
               <button className="primary-button" disabled={busyId === item.id} onClick={async () => {
                 setBusyId(item.id); setError(""); setNotice("");
                 try {
