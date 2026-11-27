@@ -152,7 +152,6 @@ export async function previewInvoke<T>(command: string, args: Record<string, unk
           const fileLinked = Object.prototype.hasOwnProperty.call(sampleProjectFileLinks, project.id + ":" + file.id);
           return rootLinked || fileLinked;
         });
-        const project = projectId === null ? null : sampleProjects.find(item => item.id === projectId);
         const linkedToProject = projectId === null || (
           ((sampleProjectRootLinks[projectId] ?? []).includes(1) || Object.prototype.hasOwnProperty.call(sampleProjectFileLinks, projectId + ":" + file.id))
         );
