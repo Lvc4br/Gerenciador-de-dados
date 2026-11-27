@@ -482,7 +482,7 @@ type FilenameSuggestion = {
   id: number; file_id: number; filename: string; relative_path: string;
   project_prefix: string | null; discipline_code: string | null;
   drawing_number: string | null; revision: string | null;
-  confidence: number; status: "pending" | "accepted" | "rejected"; applied: boolean; created_at: string;
+  confidence: number; status: "pending" | "accepted" | "rejected"; applied: boolean; titleblock_internal_number: string | null; titleblock_artesp_number: string | null; titleblock_title: string | null; created_at: string;
 };
 type SuggestionPage = { items: FilenameSuggestion[]; total: number };
 
@@ -542,6 +542,11 @@ function ReviewPanel() {
               <div><small>Número do desenho</small><b>{item.drawing_number || "—"}</b></div>
               <div><small>Revisão</small><b>{item.revision || "—"}</b></div>
               <div><small>Confiança</small><b>{Math.round(item.confidence * 100)}%</b></div>
+            </div>
+            <div className="review-metadata titleblock-comparison">
+              <div><small>Nº interno no carimbo</small><b>{item.titleblock_internal_number || "Não importado"}</b></div>
+              <div><small>Nº ARTESP no carimbo</small><b>{item.titleblock_artesp_number || "Não importado"}</b></div>
+              <div><small>Título importado</small><b>{item.titleblock_title || "Não importado"}</b></div>
             </div>
             {item.status === "pending" && <div className="dashboard-actions review-actions">
               <button className="secondary-button" disabled={busyId === item.id} onClick={() => void review(item, "rejected")}>Rejeitar</button>
