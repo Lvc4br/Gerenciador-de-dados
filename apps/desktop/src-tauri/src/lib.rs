@@ -573,6 +573,7 @@ struct FileRecord {
     sha256: String,
     root_path: String,
     status: String,
+    content_snippet: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -646,7 +647,12 @@ fn list_files(
     let direction = if ascending.unwrap_or(true) { "ASC" } else { "DESC" };
     let sql = format!(
         "SELECT f.id, f.filename, f.relative_path, f.extension, f.byte_size,
-                f.modified_at, f.sha256, r.path, f.status
+                f.modified_at, f.sha256, r.path, f.status,
+                CASE WHEN ?9=1 AND ?2!='' THEN (
+                  SELECT snippet(document_text_fts,0,'[',']',' … ',18)
+                  FROM document_text_fts
+                  WHERE document_text_fts MATCH ?2 AND rowid=f.id
+                ) ELSE NULL END
          FROM files f JOIN scan_roots r ON r.id = f.root_id
          WHERE (?1 = '' OR
            (?2 != '' AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?2)) OR
@@ -690,6 +696,7 @@ fn list_files(
             sha256: row.get(6)?,
             root_path: row.get(7)?,
             status: row.get(8)?,
+            content_snippet: row.get(9)?,
         })
     ).map_err(|e| e.to_string())?;
     let mut items = Vec::new();
