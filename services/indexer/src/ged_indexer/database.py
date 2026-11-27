@@ -30,6 +30,25 @@ CREATE TABLE IF NOT EXISTS files (
 CREATE INDEX IF NOT EXISTS idx_files_sha256 ON files(sha256);
 CREATE INDEX IF NOT EXISTS idx_files_extension ON files(extension);
 CREATE INDEX IF NOT EXISTS idx_files_filename ON files(filename);
+CREATE TABLE IF NOT EXISTS filename_suggestions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+    project_prefix TEXT,
+    discipline_code TEXT,
+    drawing_number TEXT,
+    revision TEXT,
+    confidence REAL NOT NULL DEFAULT 0,
+    source TEXT NOT NULL DEFAULT 'filename',
+    parser_version TEXT NOT NULL DEFAULT '1',
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','accepted','rejected')),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at TEXT,
+    UNIQUE(file_id, parser_version)
+);
+CREATE INDEX IF NOT EXISTS idx_filename_suggestions_status
+    ON filename_suggestions(status, confidence);
+CREATE INDEX IF NOT EXISTS idx_filename_suggestions_drawing
+    ON filename_suggestions(drawing_number);
 CREATE TABLE IF NOT EXISTS findings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
