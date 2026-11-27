@@ -238,6 +238,8 @@ type ProjectRecord = {
   status: string; root_count: number; file_count: number; created_at: string; updated_at: string;
 };
 type ProjectRoot = { id: number; path: string; added_at: string; linked: boolean };
+type ProjectDiscipline = { id: number; project_id: number; code: string; name: string; sort_order: number };
+type ProjectFile = FileRecord & { linked: boolean; discipline_id: number | null; discipline_code: string | null; discipline_name: string | null };
 
 function ProjectsPanel() {
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
@@ -247,12 +249,18 @@ function ProjectsPanel() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [client, setClient] = useState("");
   const [description, setDescription] = useState("");
   const [selected, setSelected] = useState<ProjectRecord | null>(null);
   const [roots, setRoots] = useState<ProjectRoot[]>([]);
+  const [disciplines, setDisciplines] = useState<ProjectDiscipline[]>([]);
+  const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([]);
+  const [disciplineCode, setDisciplineCode] = useState("");
+  const [disciplineName, setDisciplineName] = useState("");
+  const [fileSearch, setFileSearch] = useState("");
 
   async function loadProjects() {
     setLoading(true); setError("");
@@ -265,17 +273,37 @@ function ProjectsPanel() {
   }
   useEffect(() => { void loadProjects(); }, [search, status]);
 
-  async function selectProject(project: ProjectRecord) {
+  async function loadProjectDetails(project: ProjectRecord, term = fileSearch) {
     setSelected(project); setError("");
-    try { setRoots(await invoke<ProjectRoot[]>("list_project_roots", { projectId: project.id })); }
-    catch (reason) { setRoots([]); setError(String(reason)); }
+    try {
+      const [rootItems, disciplineItems, filePage] = await Promise.all([
+        invoke<ProjectRoot[]>("list_project_roots", { projectId: project.id }),
+        invoke<ProjectDiscipline[]>("list_project_disciplines", { projectId: project.id }),
+        invoke<{items: ProjectFile[]; total: number}>("list_project_files", { projectId: project.id, search: term, limit: 100, offset: 0 })
+      ]);
+      setRoots(rootItems); setDisciplines(disciplineItems); setProjectFiles(filePage.items);
+    } catch (reason) { setRoots([]); setDisciplines([]); setProjectFiles([]); setError(String(reason)); }
   }
-  async function createProject(event: FormEvent) {
+  useEffect(() => { if (selected) void loadProjectDetails(selected, fileSearch); }, [fileSearch]);
+
+  function resetProjectForm() {
+    setCreating(false); setEditing(false); setCode(""); setName(""); setClient(""); setDescription("");
+  }
+  function beginEdit(project: ProjectRecord) {
+    setCreating(false); setEditing(true);
+    setCode(project.code); setName(project.name); setClient(project.client); setDescription(project.description);
+  }
+  async function saveProject(event: FormEvent) {
     event.preventDefault(); setError(""); setNotice("");
     try {
-      await invoke<number>("create_project", { code, name, client, description });
-      setCode(""); setName(""); setClient(""); setDescription(""); setCreating(false);
-      setNotice("Projeto cadastrado no banco local.");
+      if (editing && selected) {
+        await invoke<void>("update_project", { id: selected.id, code, name, client, description });
+        setNotice("Projeto atualizado.");
+      } else {
+        await invoke<number>("create_project", { code, name, client, description });
+        setNotice("Projeto cadastrado no banco local.");
+      }
+      resetProjectForm();
       await loadProjects();
     } catch (reason) { setError(String(reason)); }
   }
@@ -291,28 +319,53 @@ function ProjectsPanel() {
     if (!selected) return;
     try {
       await invoke<void>("set_project_root_link", { projectId: selected.id, rootId: root.id, linked: !root.linked });
-      await selectProject(selected);
+      await loadProjectDetails(selected);
       await loadProjects();
+    } catch (reason) { setError(String(reason)); }
+  }
+  async function saveDiscipline(event: FormEvent) {
+    event.preventDefault();
+    if (!selected) return;
+    try {
+      await invoke<number>("save_project_discipline", { projectId: selected.id, code: disciplineCode, name: disciplineName, sortOrder: disciplines.length });
+      setDisciplineCode(""); setDisciplineName("");
+      await loadProjectDetails(selected);
+      setNotice("Disciplina cadastrada.");
+    } catch (reason) { setError(String(reason)); }
+  }
+  async function deleteDiscipline(discipline: ProjectDiscipline) {
+    if (!selected || !window.confirm("Excluir a disciplina " + discipline.code + "? Os documentos serão mantidos sem disciplina.")) return;
+    try {
+      await invoke<void>("delete_project_discipline", { projectId: selected.id, disciplineId: discipline.id });
+      await loadProjectDetails(selected);
+      setNotice("Disciplina excluída; os documentos foram preservados.");
+    } catch (reason) { setError(String(reason)); }
+  }
+  async function assignFileDiscipline(file: ProjectFile, value: string) {
+    if (!selected) return;
+    try {
+      await invoke<void>("set_project_file_link", { projectId: selected.id, fileId: file.id, linked: true, disciplineId: value ? Number(value) : null });
+      await loadProjectDetails(selected);
     } catch (reason) { setError(String(reason)); }
   }
 
   return (
     <section className="explorer">
       <div className="page-heading explorer-heading">
-        <div><div className="eyebrow">CATÁLOGO LOCAL</div><h1>Projetos</h1><p>Cadastre projetos e associe pastas já indexadas sem duplicar arquivos.</p></div>
-        <button className="primary-button" onClick={() => setCreating(value => !value)}><Folder size={16} /> {creating ? "Cancelar" : "Novo projeto"}</button>
+        <div><div className="eyebrow">CATÁLOGO LOCAL</div><h1>Projetos</h1><p>Biblioteca central organizada por cliente, projeto e disciplina.</p></div>
+        <button className="primary-button" onClick={() => { resetProjectForm(); setCreating(true); }}><Folder size={16} /> Novo projeto</button>
       </div>
       {notice && <div className="notice" role="status">{notice}</div>}
       {error && <div className="notice error" role="alert">{error}</div>}
-      {creating && <form className="surface-card project-form" onSubmit={createProject}>
-        <div className="card-heading"><div><h3>Novo projeto</h3><p>Os dados serão salvos no SQLite local.</p></div></div>
+      {(creating || editing) && <form className="surface-card project-form" onSubmit={saveProject}>
+        <div className="card-heading"><div><h3>{editing ? "Editar projeto" : "Novo projeto"}</h3><p>Os dados serão salvos no SQLite local.</p></div></div>
         <div className="project-form-grid">
           <label>Código *<input required maxLength={40} value={code} onChange={e => setCode(e.target.value)} placeholder="Ex.: AB20A" /></label>
           <label>Nome do projeto *<input required maxLength={180} value={name} onChange={e => setName(e.target.value)} placeholder="Nome do empreendimento" /></label>
           <label>Cliente<input value={client} onChange={e => setClient(e.target.value)} placeholder="Cliente / contratante" /></label>
           <label>Descrição<input value={description} onChange={e => setDescription(e.target.value)} placeholder="Descrição breve (opcional)" /></label>
         </div>
-        <div className="dashboard-actions"><button className="primary-button" type="submit">Salvar projeto</button><button className="secondary-button" type="button" onClick={() => setCreating(false)}>Cancelar</button></div>
+        <div className="dashboard-actions"><button className="primary-button" type="submit">{editing ? "Salvar alterações" : "Salvar projeto"}</button><button className="secondary-button" type="button" onClick={resetProjectForm}>Cancelar</button></div>
       </form>}
       <div className="explorer-toolbar">
         <label className="explorer-search"><Search size={16} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por código, nome ou cliente..." /></label>
@@ -322,7 +375,7 @@ function ProjectsPanel() {
         <div className="file-table-wrap">
           <div className="explorer-summary"><span>{loading ? "Carregando projetos..." : projects.length + " projeto(s)"}</span><span>Banco SQLite local</span></div>
           <table className="file-table"><thead><tr><th>Código / Projeto</th><th>Cliente</th><th>Pastas</th><th>Documentos</th><th>Situação</th></tr></thead>
-            <tbody>{projects.map(project => <tr key={project.id} className={selected?.id === project.id ? "selected" : ""} onClick={() => void selectProject(project)}>
+            <tbody>{projects.map(project => <tr key={project.id} className={selected?.id === project.id ? "selected" : ""} onClick={() => void loadProjectDetails(project)}>
               <td><div className="file-name"><Folder size={16} /><div><b>{project.code}</b><small>{project.name}</small></div></div></td>
               <td>{project.client || "—"}</td><td>{project.root_count}</td><td>{project.file_count.toLocaleString("pt-BR")}</td>
               <td><span className={project.status === "active" ? "file-status indexed" : "file-status missing"}>{project.status === "active" ? "Ativo" : "Arquivado"}</span></td>
@@ -336,12 +389,31 @@ function ProjectsPanel() {
             <h3>{selected.code} — {selected.name}</h3>
             <div className="detail-row"><span>Cliente</span><b>{selected.client || "—"}</b></div>
             <div className="detail-row"><span>Descrição</span><b>{selected.description || "—"}</b></div>
-            <div className="detail-row"><span>Documentos vinculados</span><b>{selected.file_count}</b></div>
+            <div className="detail-row"><span>Documentos</span><b>{selected.file_count}</b></div>
+            <div className="dashboard-actions"><button className="secondary-button" onClick={() => beginEdit(selected)}>Editar projeto</button><button className="secondary-button" onClick={() => void toggleArchive(selected)}>{selected.status === "active" ? "Arquivar" : "Reativar"}</button></div>
+            <div className="details-heading"><b>Disciplinas</b></div>
+            {disciplines.map(d => <div className="detail-row" key={d.id}><b>{d.code} — {d.name}</b><button className="sort-button" onClick={() => void deleteDiscipline(d)}>Excluir</button></div>)}
+            <form className="project-form-grid" onSubmit={saveDiscipline}>
+              <label>Código<input required maxLength={30} value={disciplineCode} onChange={e => setDisciplineCode(e.target.value)} placeholder="EST" /></label>
+              <label>Nome<input required maxLength={100} value={disciplineName} onChange={e => setDisciplineName(e.target.value)} placeholder="Estruturas" /></label>
+              <button className="secondary-button" type="submit">Adicionar disciplina</button>
+            </form>
             <div className="details-heading"><b>Pastas indexadas disponíveis</b></div>
-            {roots.length === 0 ? <p className="detail-note">Nenhuma pasta indexada foi encontrada. Importe uma pasta pela Visão geral primeiro.</p> : roots.map(root => <label className="project-root-option" key={root.id}><input type="checkbox" checked={root.linked} onChange={() => void toggleRoot(root)} /><span>{root.path}</span></label>)}
-            <button className="secondary-button" onClick={() => void toggleArchive(selected)}>{selected.status === "active" ? "Arquivar projeto" : "Reativar projeto"}</button>
-            <p className="detail-note">Arquivar não exclui arquivos nem remove a indexação. Uma pasta pode ser compartilhada entre projetos.</p>
-          </> : <p className="detail-note">Selecione um projeto para consultar seus dados e vincular pastas já indexadas.</p>}
+            {roots.length === 0 ? <p className="detail-note">Nenhuma pasta indexada. Importe uma pasta pela Visão geral primeiro.</p> : roots.map(root => <label className="project-root-option" key={root.id}><input type="checkbox" checked={root.linked} onChange={() => void toggleRoot(root)} /><span>{root.path}</span></label>)}
+            <div className="details-heading"><b>Documentos do projeto</b></div>
+            <label className="explorer-search"><Search size={14} /><input value={fileSearch} onChange={e => setFileSearch(e.target.value)} placeholder="Pesquisar documentos..." /></label>
+            <div className="project-document-list">
+              {projectFiles.map(file => <div className="detail-row" key={file.id}>
+                <div><b>{file.filename}</b><small>{file.relative_path}</small></div>
+                <select aria-label={"Disciplina de " + file.filename} value={file.discipline_id ?? ""} onChange={e => void assignFileDiscipline(file,e.target.value)}>
+                  <option value="">Sem disciplina</option>
+                  {disciplines.map(d => <option key={d.id} value={d.id}>{d.code} — {d.name}</option>)}
+                </select>
+              </div>)}
+              {projectFiles.length === 0 && <p className="detail-note">Nenhum documento encontrado nas pastas vinculadas.</p>}
+            </div>
+            <p className="detail-note">Os documentos são referências aos arquivos originais. O GED não os move nem modifica.</p>
+          </> : <p className="detail-note">Selecione um projeto para consultar documentos, gerenciar disciplinas e vincular pastas indexadas.</p>}
         </aside>
       </div>
     </section>
