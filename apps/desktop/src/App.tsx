@@ -206,10 +206,10 @@ function ExplorerPanel() {
               <button className="secondary-button" disabled={extractingPdf || selected.status !== 'indexed'} onClick={async () => {
                 setExtractingPdf(true); setContentNotice(''); setError('');
                 try {
-                  const result = await invoke<{character_count:number;needs_ocr:boolean}>('extract_pdf_text', { fileId: selected.id });
+                  const result = await invoke<{character_count:number;page_count:number;pages_with_text:number;needs_ocr:boolean}>('extract_pdf_text', { fileId: selected.id });
                   setContentNotice(result.needs_ocr
                     ? 'PDF sem texto selecionável. Será necessário OCR para pesquisar o conteúdo.'
-                    : 'Texto extraído: ' + result.character_count.toLocaleString('pt-BR') + ' caracteres. A pesquisa por conteúdo já pode ser utilizada.');
+                    : 'Texto extraído: ' + result.character_count.toLocaleString('pt-BR') + ' caracteres em ' + result.pages_with_text + ' página(s) com texto de ' + result.page_count + '. A pesquisa por conteúdo já pode ser utilizada.');
                   if (!result.needs_ocr) setSearchInContent(true);
                 } catch (reason) { setError(String(reason)); }
                 finally { setExtractingPdf(false); }
