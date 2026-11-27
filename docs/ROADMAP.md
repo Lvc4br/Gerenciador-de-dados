@@ -26,6 +26,17 @@
 
 **Aceite:** instalar em Windows limpo, operar offline, indexar a amostra AB20A e manter originais intactos.
 
+## Fase 1A — Catálogo de projetos
+
+- Modelo lógico de projetos separado das raízes físicas indexadas.
+- Cadastro com código único, nome, cliente, descrição e status.
+- Vínculo reutilizável entre projetos e raízes existentes.
+- Disciplinas configuráveis por projeto.
+- Associação de documentos com origem e evidência, sem mover ou alterar originais.
+- Testes de migração, integridade referencial e persistência offline.
+
+**Especificação:** [PROJECT_CATALOG.md](PROJECT_CATALOG.md).
+
 ## Fase 2 — Engenharia e divergências
 
 - Parser CSV AB20A (UTF-8 BOM e delimitador ponto e vírgula).
