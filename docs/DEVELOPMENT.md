@@ -60,4 +60,4 @@ O aplicativo cria `ged.sqlite3` no diretório de dados da aplicação do usuári
 - Painel de propriedades com caminho, tipo, tamanho, data de modificação e SHA-256.
 - Preservação dos originais: não há operação de escrita, renomeação ou exclusão nos arquivos indexados.
 
-A indexação inicial não interpreta ainda o conteúdo de DWG, PDF ou Office. O Explorador lista os arquivos indexados, mas ainda não abre nem renderiza seu conteúdo. Também não classifica automaticamente arquivos como projetos; registra pastas-raiz e arquivos. Esses recursos pertencem às próximas etapas.
+A indexação reconhece os dois esquemas CSV de metadados de desenhos e divergências. Ela ainda não interpreta diretamente o conteúdo binário de DWG, PDF ou Office. O Explorador lista os arquivos indexados, mas ainda não abre nem renderiza seu conteúdo. Também não classifica automaticamente arquivos como projetos; registra pastas-raiz e arquivos. Esses recursos pertencem às próximas etapas.
