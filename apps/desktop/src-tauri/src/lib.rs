@@ -273,6 +273,12 @@ fn validate_backup_database(path: &Path) -> Result<Connection, String> {
     if has_files != 3 {
         return Err("O arquivo selecionado não contém o esquema esperado do GED.".into());
     }
+    let foreign_key_errors: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM pragma_foreign_key_check", [], |row| row.get(0)
+    ).map_err(|e| format!("Não foi possível validar as relações do backup: {e}"))?;
+    if foreign_key_errors > 0 {
+        return Err(format!("Backup inválido: {foreign_key_errors} relação(ões) quebrada(s)."));
+    }
     Ok(connection)
 }
 
@@ -329,11 +335,38 @@ fn restore_database_backup(app: tauri::AppHandle, source_path: String) -> Result
     drop(current);
 
     let mut destination = open_database(&app)?;
-    copy_database(&source, &mut destination)?;
-    let integrity: String = destination.query_row("PRAGMA integrity_check", [], |row| row.get(0))
-        .map_err(|e| e.to_string())?;
-    if integrity != "ok" {
-        return Err(format!("A restauração foi aplicada, mas a verificação falhou: {integrity}. Cópia de segurança anterior: {}", safety_path.display()));
+    let restore_result = (|| -> Result<(), String> {
+        copy_database(&source, &mut destination)?;
+        let integrity: String = destination.query_row("PRAGMA integrity_check", [], |row| row.get(0))
+            .map_err(|e| e.to_string())?;
+        if integrity != "ok" {
+            return Err(format!("integrity_check: {integrity}"));
+        }
+        let foreign_key_errors: i64 = destination.query_row(
+            "SELECT COUNT(*) FROM pragma_foreign_key_check", [], |row| row.get(0)
+        ).map_err(|e| e.to_string())?;
+        if foreign_key_errors > 0 {
+            return Err(format!("{foreign_key_errors} relação(ões) quebrada(s)"));
+        }
+        Ok(())
+    })();
+
+    if let Err(error) = restore_result {
+        let safety_source = Connection::open_with_flags(
+            &safety_path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX
+        ).map_err(|rollback_error| format!(
+            "A restauração falhou ({error}) e a cópia de segurança não pôde ser aberta ({rollback_error}). Arquivo preservado: {}",
+            safety_path.display()
+        ))?;
+        copy_database(&safety_source, &mut destination).map_err(|rollback_error| format!(
+            "A restauração falhou ({error}) e a recuperação automática também falhou ({rollback_error}). Cópia preservada em: {}",
+            safety_path.display()
+        ))?;
+        return Err(format!(
+            "A restauração foi cancelada e o banco anterior foi recuperado. Motivo: {error}. Cópia de segurança: {}",
+            safety_path.display()
+        ));
     }
     Ok(safety_path.to_string_lossy().to_string())
 }
@@ -552,4 +585,31 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![scan_folder, get_dashboard_stats, create_database_backup, restore_database_backup, list_files, list_file_versions, list_discrepancies])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar o GED Desktop");
+}
+
+
+#[cfg(test)]
+mod backup_tests {
+    use super::*;
+
+    #[test]
+    fn sqlite_online_backup_preserves_schema_and_rows() {
+        let source = Connection::open_in_memory().expect("open source");
+        source.execute_batch(
+            "CREATE TABLE sample(id INTEGER PRIMARY KEY, label TEXT NOT NULL);
+             INSERT INTO sample(label) VALUES ('GED backup test');"
+        ).expect("seed source");
+        let mut destination = Connection::open_in_memory().expect("open destination");
+
+        copy_database(&source, &mut destination).expect("copy database");
+
+        let label: String = destination.query_row(
+            "SELECT label FROM sample WHERE id=1", [], |row| row.get(0)
+        ).expect("read restored row");
+        assert_eq!(label, "GED backup test");
+        let integrity: String = destination.query_row(
+            "PRAGMA integrity_check", [], |row| row.get(0)
+        ).expect("check integrity");
+        assert_eq!(integrity, "ok");
+    }
 }
