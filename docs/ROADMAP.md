@@ -54,7 +54,7 @@
 - Nenhum arquivo é aberto, renomeado, movido ou alterado por essa análise.
 - A extração usada pelo executável é realizada no backend Rust/Tauri com `pdf-extract`; o texto é salvo no SQLite do próprio desktop em `extracted_document_text` e indexado em `document_text_fts` (FTS5).
 - O Explorador permite extrair um PDF selecionado ou processar PDFs pendentes em lotes limitados, e habilitar a busca pelo conteúdo já extraído.
-- O backend confere o SHA-256 antes da extração, limita PDFs a 200 MB e textos extraídos a 10 milhões de caracteres, e executa a leitura fora da thread principal.
+- O backend confere o SHA-256 antes da extração, limita PDFs a 200 MB, 5.000 páginas e textos extraídos a 10 milhões de caracteres, e executa a leitura fora da thread principal.
 - PDFs sem texto selecionável são identificados como candidatos a OCR; OCR ainda não está incluído.
 - O módulo Python/CLI criado anteriormente permanece como protótipo experimental independente e não é usado pelo executável desktop.
 
