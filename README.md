@@ -88,7 +88,7 @@ A branch `feature/mvp-core-indexer` contém:
 - reimportação CSV transacional com savepoint, limpeza de linhas excedentes e reconciliação quando o esquema da fonte muda;
 - núcleo Python inicial e testes do scanner, ainda não integrado ao desktop como sidecar.
 
-**Ainda não é uma versão pronta para uso ou distribuição.** O build Windows também recebeu uma correção para gerar o ícone ICO exigido pelo Tauri; a correção aguarda confirmação no CI. A varredura é executada fora da thread da interface e informa progresso periodicamente; ainda não há cancelamento. Não há build Windows aprovado nem instalador validado. A leitura direta de DWG/PDF/Office, visualizadores, versões imutáveis, busca FTS5, exportações completas e auditoria operacional ainda precisam ser implementadas.
+**Ainda não é uma versão pronta para uso ou distribuição.** O build Windows também recebeu uma correção para gerar o ícone ICO exigido pelo Tauri; a correção aguarda confirmação no CI. A varredura é executada fora da thread da interface e informa progresso periodicamente; ainda não há cancelamento. Não há build Windows aprovado nem instalador validado. A leitura direta de DWG/PDF/Office, visualizadores, armazenamento binário de versões antigas, busca FTS5, exportações completas e auditoria operacional ainda precisam ser implementados.
 
 ## Próximas entregas
 
