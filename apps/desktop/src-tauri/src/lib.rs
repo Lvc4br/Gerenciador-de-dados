@@ -140,6 +140,7 @@ fn open_database(app: &tauri::AppHandle) -> Result<Connection, String> {
     apply_fts_migration(&connection)?;
     csv_metadata::ensure_schema(&connection)?;
     projects::ensure_schema(&connection)?;
+    projects::ensure_relations_schema(&connection)?;
     Ok(connection)
 }
 
@@ -724,11 +725,55 @@ fn set_project_root_link(app: tauri::AppHandle, project_id: i64, root_id: i64, l
     projects::link_root(&connection, project_id, root_id, linked)
 }
 
+
+#[tauri::command]
+fn list_project_disciplines(app: tauri::AppHandle, project_id: i64) -> Result<Vec<projects::ProjectDisciplineRecord>, String> {
+    let connection = open_database(&app)?;
+    projects::list_disciplines(&connection, project_id)
+}
+
+#[tauri::command]
+fn save_project_discipline(
+    app: tauri::AppHandle, project_id: i64, id: Option<i64>,
+    code: String, name: String, sort_order: Option<i64>,
+) -> Result<i64, String> {
+    let connection = open_database(&app)?;
+    projects::save_discipline(&connection, project_id, id, &code, &name, sort_order.unwrap_or(0))
+}
+
+#[tauri::command]
+fn delete_project_discipline(app: tauri::AppHandle, project_id: i64, discipline_id: i64) -> Result<(), String> {
+    let connection = open_database(&app)?;
+    projects::delete_discipline(&connection, project_id, discipline_id)
+}
+
+#[tauri::command]
+fn list_project_files(
+    app: tauri::AppHandle, project_id: i64, search: Option<String>,
+    discipline_id: Option<i64>, limit: Option<u32>, offset: Option<u32>,
+) -> Result<serde_json::Value, String> {
+    let connection = open_database(&app)?;
+    let (items,total) = projects::list_project_files(
+        &connection, project_id, search.as_deref().unwrap_or(""), discipline_id,
+        limit.unwrap_or(100), offset.unwrap_or(0)
+    )?;
+    Ok(serde_json::json!({ "items": items, "total": total }))
+}
+
+#[tauri::command]
+fn set_project_file_link(
+    app: tauri::AppHandle, project_id: i64, file_id: i64,
+    linked: bool, discipline_id: Option<i64>,
+) -> Result<(), String> {
+    let connection = open_database(&app)?;
+    projects::set_project_file_link(&connection, project_id, file_id, linked, discipline_id)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![scan_folder, get_dashboard_stats, create_database_backup, restore_database_backup, list_files, list_file_versions, list_discrepancies, list_projects, create_project, update_project, archive_project, list_project_roots, set_project_root_link])
+        .invoke_handler(tauri::generate_handler![scan_folder, get_dashboard_stats, create_database_backup, restore_database_backup, list_files, list_file_versions, list_discrepancies, list_projects, create_project, update_project, archive_project, list_project_roots, set_project_root_link, list_project_disciplines, save_project_discipline, delete_project_discipline, list_project_files, set_project_file_link])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar o GED Desktop");
 }
