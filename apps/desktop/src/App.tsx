@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
   Archive, ArrowDownToLine, Bell, BookOpen, ChevronRight,
@@ -11,6 +12,7 @@ import {
 type Section = "Visão geral" | "Projetos" | "Explorador" | "Divergências" | "Exportações";
 type DashboardStats = { root_count: number; file_count: number; duplicate_hash_groups: number; drawing_metadata_count: number; discrepancy_count: number };
 type ScanSummary = { root: string; indexed: number; skipped: number; errors: number; missing: number; reconciliation_complete: boolean; duplicate_hash_groups: number };
+type ScanProgress = { root: string; visited: number; indexed: number; skipped: number; errors: number };
 
 const navigation: { label: Section; icon: typeof LayoutDashboard }[] = [
   { label: "Visão geral", icon: LayoutDashboard },
@@ -220,8 +222,13 @@ function App() {
     const selected = await open({ directory: true, multiple: false, title: "Selecionar pasta de projetos" });
     if (typeof selected !== "string") return;
     setScanning(true);
-    setMessage("Indexando arquivos. Os originais não serão modificados.");
+    setMessage("Preparando indexação. Os originais não serão modificados.");
+    let stopListening: (() => void) | undefined;
     try {
+      stopListening = await listen<ScanProgress>("scan-progress", event => {
+        const progress = event.payload;
+        setMessage(`Verificados ${progress.visited.toLocaleString("pt-BR")} arquivos — ${progress.indexed.toLocaleString("pt-BR")} indexados, ${progress.skipped} ignorados e ${progress.errors} erros.`);
+      });
       const result = await invoke<ScanSummary>("scan_folder", { folder: selected });
       await refreshStats();
       setMessage(`Indexação concluída: ${result.indexed} arquivo(s) indexado(s), ${result.skipped} ignorado(s), ${result.errors} erro(s), ${result.missing} ausente(s). ${result.duplicate_hash_groups} grupo(s) de hashes duplicados. ${result.reconciliation_complete ? "Reconciliação concluída." : "Reconciliação parcial: houve erros ao percorrer a pasta; arquivos não foram marcados como ausentes."}`);
@@ -229,6 +236,7 @@ function App() {
       setError(String(reason));
       setMessage("");
     } finally {
+      stopListening?.();
       setScanning(false);
     }
   }
