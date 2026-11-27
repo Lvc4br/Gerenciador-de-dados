@@ -349,6 +349,38 @@ fn list_files(
 
 
 #[derive(Serialize)]
+struct FileVersionRecord {
+    id: i64,
+    sha256: String,
+    byte_size: i64,
+    modified_at: String,
+    captured_at: String,
+}
+
+#[tauri::command]
+fn list_file_versions(
+    app: tauri::AppHandle,
+    file_id: i64,
+) -> Result<Vec<FileVersionRecord>, String> {
+    let connection = open_database(&app)?;
+    let mut statement = connection.prepare(
+        "SELECT id, sha256, byte_size, modified_at, captured_at
+         FROM file_versions WHERE file_id=?1
+         ORDER BY captured_at DESC, id DESC"
+    ).map_err(|e| e.to_string())?;
+    let rows = statement.query_map(params![file_id], |row| Ok(FileVersionRecord {
+        id: row.get(0)?,
+        sha256: row.get(1)?,
+        byte_size: row.get(2)?,
+        modified_at: row.get(3)?,
+        captured_at: row.get(4)?,
+    })).map_err(|e| e.to_string())?;
+    let mut versions = Vec::new();
+    for row in rows { versions.push(row.map_err(|e| e.to_string())?); }
+    Ok(versions)
+}
+
+#[derive(Serialize)]
 struct DiscrepancyRecord {
     id: i64,
     filename: String,
@@ -431,7 +463,7 @@ fn list_discrepancies(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![scan_folder, get_dashboard_stats, list_files, list_discrepancies])
+        .invoke_handler(tauri::generate_handler![scan_folder, get_dashboard_stats, list_files, list_file_versions, list_discrepancies])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar o GED Desktop");
 }
