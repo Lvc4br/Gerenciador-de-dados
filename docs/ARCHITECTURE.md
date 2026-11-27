@@ -1,150 +1,152 @@
-# Arquitetura do GED
+# Arquitetura desktop do GED
 
-## 1. Decisões arquiteturais
+## 1. Decisão principal
 
-### 1.1 Monólito modular + workers assíncronos
+O GED é um **aplicativo desktop Windows**, instalado localmente e distribuído como `.exe`/instalador. Não é um SaaS nem uma aplicação cujo uso normal dependa do navegador.
 
-Começar com uma API FastAPI organizada por domínio e processos de background separados. Evitar microserviços prematuros. Os módulos devem comunicar-se por interfaces internas e eventos de domínio; extraí-los para serviços independentes somente quando escala, isolamento ou equipes justificarem.
+### Stack
 
-### 1.2 Contextos de domínio
+- Tauri 2: shell desktop, janela, menus, permissões e empacotamento.
+- React + TypeScript: interface.
+- Python sidecar empacotado: extração, OCR, classificação, regras e adaptadores técnicos.
+- SQLite: catálogo, metadados, jobs, auditoria e índice FTS5.
+- Sistema de arquivos: originais e derivados locais.
+- Serviços externos opcionais: somente para sincronização, IA remota ou integrações explicitamente habilitadas.
 
-- Identity & Access: usuários, grupos, papéis, workspaces e políticas.
-- Project Registry: obras, contratos, empreendimentos, locais e disciplinas.
-- Document Vault: arquivos, versões, hashes, armazenamento e retenção.
-- Ingestion: upload, antivírus, detecção de formato, extração e normalização.
-- Metadata & Taxonomy: campos normalizados, taxonomias e proveniência.
-- Search: pesquisa textual, filtros, facetas e vetores.
-- Quality & Findings: regras, divergências, duplicidades e revisão humana.
-- Comparison: diferenças entre versões e documentos relacionados.
-- Recommendation: candidatos semelhantes, explicações e feedback.
-- Preview: geração de derivados seguros para visualização.
-- Export & Reporting: relatórios, pacotes, planilhas e manifestos.
-- Audit: trilha imutável de ações relevantes.
+O aplicativo deve operar offline para importação local, pesquisa, classificação, análise, visualização suportada e exportação.
 
 ## 2. Diagrama de contexto
 
 ```mermaid
-flowchart LR
-  U[Engenheiro / Gestor / Arquivista] --> WEB[Aplicação Web]
-  WEB --> API[API GED]
-  API --> AUTH[Identidade e autorização]
-  API --> DB[(PostgreSQL)]
-  API --> OBJ[(Object Storage)]
-  API --> Q[Redis / fila]
-  Q --> W[Workers de ingestão]
-  W --> AV[Antivírus e validação]
-  W --> PAR[Adaptadores de extração]
-  PAR --> CAD[CAD / BIM]
-  PAR --> PDF[PDF / OCR]
-  PAR --> OFF[Office / CSV]
-  W --> DB
-  W --> OBJ
-  API --> SEARCH[Busca textual e vetorial]
-  SEARCH --> DB
-  API --> VIEW[Serviço de derivados e preview]
-  API --> EXP[Exportação e relatórios]
-  API --> AUD[Auditoria]
+flowchart TB
+  U[Engenheiro] --> APP[GED Desktop Windows]
+  APP --> UI[React + TypeScript]
+  UI --> TAURI[Tauri / comandos nativos]
+  TAURI --> CORE[Python sidecar empacotado]
+  CORE --> DB[(SQLite + FTS5)]
+  CORE --> FS[Pastas locais / rede autorizada]
+  CORE --> PARSERS[Adaptadores PDF, Office, CSV, CAD, BIM]
+  CORE --> RULES[Classificação e divergências]
+  CORE --> SEARCH[Busca e recomendação local]
+  CORE --> PREVIEW[Previews e miniaturas]
+  CORE --> EXPORT[Exportação e relatórios]
+  APP -. opcional e consentido .-> SYNC[Servidor corporativo futuro]
 ```
 
-## 3. Pipeline de ingestão
+## 3. Organização do código
+
+```text
+gerenciador-de-dados/
+  apps/
+    desktop/                 # Tauri 2 + React + TypeScript
+      src/                   # telas, componentes, estado
+      src-tauri/             # Rust commands, permissões, bundler
+  engine/
+    ged_engine/              # Python sidecar
+      core/                  # configuração, logging, erros
+      catalog/               # projetos, documentos, versões
+      ingestion/             # varredura, importação, jobs
+      metadata/              # extração e proveniência
+      taxonomy/              # classificação
+      findings/              # regras e divergências
+      search/                # FTS e similaridade
+      preview/               # derivados seguros
+      export/                # exportadores e manifestos
+      adapters/              # csv, pdf, office, image, cad, ifc
+      db/                    # SQLite, modelos e migrações
+      tests/
+  installer/                 # ícones, configuração e scripts
+  docs/
+```
+
+## 4. Fluxo de importação local
 
 ```mermaid
 flowchart TD
-  A[Upload / pasta / integração] --> B[Quarentena]
-  B --> C{Antivírus e política aprovados?}
-  C -- Não --> X[Quarentena + incidente]
-  C -- Sim --> D[Hash SHA-256 e detecção MIME]
-  D --> E{Formato reconhecido?}
-  E -- Não --> F[Registrar como não suportado]
-  E -- Sim --> G[Armazenar original imutável]
-  G --> H[Enfileirar extração]
-  H --> I[Extrair texto, propriedades e geometria permitida]
-  I --> J[Normalizar unidades e metadados]
-  J --> K[Classificação sugerida + confiança]
-  K --> L[Regras de consistência e duplicidade]
-  L --> M[Indexação e derivados de preview]
-  M --> N[Revisão humana quando necessário]
-  N --> O[Disponível para busca]
+  A[Usuário seleciona pasta/arquivos] --> B[Validar diretórios e permissões]
+  B --> C[Varredura recursiva controlada]
+  C --> D[Detectar formato e calcular SHA-256]
+  D --> E{Arquivo já catalogado?}
+  E -- Sim --> F[Registrar ocorrência/localização ou duplicidade]
+  E -- Não --> G[Registrar documento e versão]
+  G --> H[Enfileirar job local]
+  H --> I[Extrair texto, propriedades e estrutura]
+  I --> J[Normalizar metadados preservando valores brutos]
+  J --> K[Classificar e executar regras]
+  K --> L[Gerar preview e indexar]
+  L --> M[Disponibilizar no Explorer e na busca]
+  F --> M
 ```
 
-Cada etapa deve ser idempotente: reprocessar o mesmo arquivo não deve criar documentos duplicados. Usar chave de idempotência baseada em workspace, hash, versão do pipeline e parâmetros.
+Não copiar nem mover arquivos por padrão: catalogar no local de origem e manter o original intacto. Oferecer cópia para uma biblioteca gerenciada apenas como ação explícita.
 
-## 4. Pipeline de divergências
+## 5. Domínios
 
-1. Extrair valores candidatos de fontes distintas (nome, carimbo, propriedades internas, planilha de controle, metadados do usuário).
-2. Preservar cada valor com origem, página/folha/entidade, coordenadas quando disponíveis, método e confiança.
-3. Normalizar apenas para comparação, preservando o texto original.
-4. Aplicar regras versionadas e específicas do workspace/disciplina.
-5. Criar achados com severidade, evidência, explicação e estado.
-6. Permitir confirmação, rejeição ou correção por profissional autorizado.
-7. Registrar auditoria e manter histórico das decisões.
+- Workspace/Profile: perfil local e configuração.
+- Project Registry: obras, contratos, locais e disciplinas.
+- Document Catalog: documentos, versões, caminhos e hashes.
+- Ingestion: varredura, detecção, extração e jobs.
+- Metadata & Taxonomy: campos normalizados, taxonomia e proveniência.
+- Search: texto completo, filtros e similaridade local.
+- Quality & Findings: divergências, duplicidades e revisão humana.
+- Comparison: diferenças entre versões/documentos.
+- Recommendation: referências semelhantes e justificativas.
+- Preview: miniaturas e derivados.
+- Export & Reporting: relatórios, planilhas e pacotes.
+- Audit: trilha local das operações.
 
-Exemplos de regras:
-- Número do desenho no nome diferente do número identificado no carimbo.
-- Título do carimbo diferente do título cadastrado para o mesmo identificador.
-- Revisão no nome diferente da revisão interna.
-- Mesmo hash em caminhos diferentes (duplicidade exata).
-- Mesmo identificador com títulos, revisões ou disciplinas conflitantes.
-- Referência cruzada a arquivo ausente.
-- Unidade, escala ou sistema de coordenadas divergente, somente quando os campos e regras aplicáveis forem conhecidos.
+## 6. Banco e armazenamento
 
-**Importante:** divergência é um sinal para revisão, não uma conclusão automática de erro de projeto ou não conformidade normativa.
+SQLite é a fonte primária no MVP. Usar transações, WAL quando adequado, foreign keys, índices, FTS5 e migrações versionadas. O banco fica em diretório de dados do usuário, separado do diretório de instalação.
 
-## 5. Adaptadores de formato
+Os arquivos originais permanecem nos caminhos escolhidos pelo usuário. O GED guarda metadados, hash, caminho, tamanho, datas e resultados de extração. Previews, thumbnails, cache e exports ficam em diretórios próprios do GED. Deve existir ferramenta para relocalizar raiz de biblioteca e reparar caminhos quebrados.
 
-Criar interface comum `DocumentAdapter`:
-- `detect(file)`
-- `extract_metadata(file)`
-- `extract_text(file)`
-- `extract_structure(file)`
-- `render_preview(file)`
-- `compare(a, b)` quando houver implementação confiável
-- `capabilities()`
+Para grandes volumes, evitar carregar arquivos inteiros na memória. Processar em streaming e limitar concorrência configurável.
 
-Cada adaptador informa formatos e versões efetivamente suportados, limitações, dependências externas e se a operação é somente leitura ou permite conversão.
+## 7. Comunicação entre interface e motor
 
-Não prometer leitura ou exportação universal. DWG/DXF, RVT, DGN e outros formatos proprietários podem depender de SDKs, serviços comerciais ou conversores com licenças específicas. Manter o original e exportar o original sem conversão sempre que permitido.
+Preferir comandos Tauri para operações nativas pequenas e um canal IPC local restrito para jobs longos do Python sidecar. Se usar HTTP loopback, vincular somente a localhost, autenticar com token efêmero por execução, escolher porta dinâmica, validar origem e encerrar o processo ao fechar o aplicativo. Nunca expor uma API aberta na rede local por padrão.
 
-## 6. Busca e recomendação
+O sidecar deve iniciar e parar com o app, reportar saúde/versão e comunicar progresso por eventos. Falhas do motor não podem corromper o catálogo.
 
-### Busca híbrida
-- Filtros estruturados: obra, rodovia, trecho, ramo, disciplina, tipo, etapa, revisão, data, autor, escala, formato e estado.
-- Texto completo: nome, título, conteúdo extraído, notas e identificadores.
-- Semântica: embeddings de título, descrição e trechos textuais, com filtros de autorização aplicados antes de retornar resultados.
-- Similaridade técnica: atributos normalizados, geometria quando disponível, sistema construtivo, tipologia, dimensões e contexto.
+## 8. Divergências
 
-### Ranking inicial (configurável)
-- 35% correspondência de atributos técnicos;
-- 25% correspondência textual/semântica;
-- 20% contexto de obra, local e disciplina;
-- 10% tipologia e etapa;
-- 10% qualidade/completude dos metadados.
+1. Extrair valores candidatos de nome, carimbo, propriedades internas e tabelas.
+2. Preservar cada valor com origem, método, confiança e localização (página/folha/entidade/coordenadas).
+3. Normalizar apenas para comparar; preservar o bruto.
+4. Aplicar regras versionadas por tipo de documento/disciplina.
+5. Criar achados com severidade, evidência e estado.
+6. Permitir confirmar, rejeitar, resolver ou aceitar risco com justificativa.
+7. Auditar decisões.
 
-Os pesos são hipótese inicial, não verdade universal. Devem ser calibrados com avaliação dos engenheiros e feedback explícito. Exibir por que cada resultado foi recomendado.
+Divergência é alerta para revisão, não conclusão automática de erro ou não conformidade.
 
-## 7. Segurança e confiabilidade
+## 9. Busca e recomendação local
 
-- Autenticação OIDC/OAuth2; MFA conforme provedor.
-- RBAC por workspace e projeto; considerar ABAC para sigilo, contrato e classificação.
-- Isolamento por tenant/workspace em todas as consultas.
-- Criptografia em trânsito e repouso; gestão de chaves fora do código.
-- Antivírus, limites de tamanho, rate limiting e validação MIME/magic bytes.
-- Não executar macros, scripts ou conteúdo ativo de documentos.
-- Workers isolados, sem acesso desnecessário à rede, com limites de CPU, memória e tempo.
-- URLs assinadas e temporárias para download.
-- Logs sem conteúdo sensível; trilha de auditoria para ações críticas.
-- Backup, restauração testada, retenção e política de descarte.
-- LGPD: finalidade, minimização, controle de acesso, retenção e atendimento a titulares quando houver dados pessoais.
-- Segredos em secret manager/variáveis protegidas; nunca no repositório.
+- FTS5 para nome, título, conteúdo e identificadores.
+- Filtros estruturados: obra, rodovia, trecho, ramo, disciplina, tipo, etapa, revisão, data, escala e formato.
+- Similaridade lexical e técnica por atributos normalizados.
+- Embeddings locais opcionais, ativados conforme hardware e licença/modelo.
+- Ranking explicável: exibir atributos coincidentes, diferenças e dados ausentes.
 
-## 8. Observabilidade e operação
+Nunca recomendar projeto como tecnicamente aplicável apenas por similaridade. A decisão é do engenheiro responsável.
 
-Métricas: arquivos recebidos, taxa de extração, falhas por formato, tempo por etapa, fila pendente, taxa de revisão humana, falsos positivos das regras, qualidade da busca, tempo de resposta e erros de exportação.
+## 10. Formatos CAD/BIM
 
-Logs estruturados com correlation_id, document_id, workspace_id e pipeline_version. Instrumentar traces entre API, fila e workers. Criar alertas para fila parada, falha de armazenamento, crescimento de erros e indisponibilidade.
+Implementar adaptadores com capacidades declaradas por formato/versão. DWG e RVT podem exigir SDKs ou licenças comerciais. Fazer prova de conceito com os DWGs reais antes de escolher biblioteca. Não converter silenciosamente nem alterar o original.
 
-## 9. Implantação evolutiva
+## 11. Segurança desktop
 
-- Desenvolvimento: Docker Compose (API, frontend, PostgreSQL, Redis, MinIO).
-- Piloto: serviços gerenciados ou VMs com backup, observabilidade e storage redundante.
-- Escala: workers horizontais, OpenSearch dedicado, cache, CDN para previews e serviços especializados CAD/BIM.
+- Permissões nativas Tauri com allowlist mínima.
+- Acesso a pastas somente após seleção/autorização do usuário.
+- Não executar macros, scripts ou conteúdo ativo dos documentos.
+- Processar arquivos potencialmente maliciosos em subprocessos isolados, com limites de tempo/memória.
+- Guardar tokens/segredos no armazenamento seguro do sistema operacional quando necessário.
+- Não enviar documentos para nuvem sem consentimento explícito.
+- Logs sem conteúdo sensível; auditoria de importação, edição, exportação e exclusão.
+- Backup do catálogo e opção de backup dos arquivos gerenciados.
+- Assinatura do instalador e atualização segura antes de distribuição ampla.
+
+## 12. Evolução multiusuário
+
+A primeira versão é local e single-user/perfil local. Para colaboração futura, adicionar serviço de sincronização e API corporativa como módulo opcional, com conflitos de sincronização, identidade central e PostgreSQL no servidor. Não introduzir PostgreSQL, Redis, MinIO ou dependência de nuvem no MVP desktop.
