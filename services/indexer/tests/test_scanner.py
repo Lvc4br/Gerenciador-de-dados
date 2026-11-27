@@ -45,7 +45,8 @@ def test_scan_persists_filename_suggestions_without_project_assignment(tmp_path:
     (root / "AB20A-EST-001_REV02.dwg").write_text("drawing", encoding="utf-8")
 
     with connect(tmp_path / "ged.sqlite3") as connection:
-        scan_folder(connection, root)
+        summary = scan_folder(connection, root)
+        assert summary["filename_suggestions"] == 1
         suggestion = connection.execute(
             """
             SELECT s.project_prefix, s.discipline_code, s.drawing_number,
