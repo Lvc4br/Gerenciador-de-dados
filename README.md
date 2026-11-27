@@ -31,13 +31,13 @@ A arquitetura poderá evoluir para sincronização opcional com servidor corpora
 | Processamento documental | Rust no desktop; Python experimental para parsers e análise especializada |
 | Banco local | SQLite + FTS5 |
 | Extração textual PDF | `pdf-extract` no backend Rust; PDF.js permanece opção para visualização |
-| OCR | Tesseract como primeira prova de conceito |
+| OCR (planejado) | Tesseract como primeira prova de conceito, sujeito a teste de qualidade e empacotamento |
 | CSV/Office | Bibliotecas Python especializadas por formato |
 | CAD/BIM | Adaptadores isolados; validar SDK, versões e licenças |
 | Testes | pytest, testes Rust e testes de interface |
 | CI e instaladores | GitHub Actions em Windows x64; MSI/NSIS |
 
-**Divisão recomendada:** Rust/Tauri para desktop, permissões e operações locais; React/TypeScript para interface; Python para extração e análise documental; SQLite para catálogo e busca local. Não adicionar PostgreSQL, Redis ou nuvem no MVP single-user.
+**Divisão atual:** Rust/Tauri para desktop, indexação, extração textual PDF e operações locais; React/TypeScript para interface; SQLite para catálogo e busca local. Python permanece experimental para parsers especializados e poderá ser integrado como sidecar quando OCR/Office justificarem essa camada. Não adicionar PostgreSQL, Redis ou nuvem no MVP single-user.
 
 ## Evidência inicial: conjunto AB20A
 
