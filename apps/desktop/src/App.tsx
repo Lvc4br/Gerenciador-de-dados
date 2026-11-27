@@ -29,7 +29,7 @@ const emptyStats: DashboardStats = { root_count: 0, file_count: 0, duplicate_has
 
 type FileRecord = {
   id: number; filename: string; relative_path: string; extension: string;
-  byte_size: number; modified_at: string; sha256: string; root_path: string; status: string; content_snippet?: string | null;
+  byte_size: number; modified_at: string; sha256: string; root_path: string; status: string; content_snippet?: string | null; pdf_text_indexed?: boolean; pdf_text_characters?: number | null; pdf_page_count?: number | null; pdf_extracted_at?: string | null;
 };
 type FilePage = { items: FileRecord[]; total: number };
 type FileVersion = { id: number; sha256: string; byte_size: number; modified_at: string; captured_at: string };
@@ -151,7 +151,7 @@ function ExplorerPanel() {
             try {
               const result = await invoke<{processed:number;needs_ocr:number;errors:number}>('extract_pending_pdf_text', { limit: 50 });
               setBatchNotice(result.processed + ' PDF(s) processado(s), ' + result.needs_ocr + ' sem texto selecionável e ' + result.errors + ' erro(s).');
-              if (searchInContent) await loadFiles();
+              await loadFiles();
             } catch (reason) { setError(String(reason)); }
             finally { setExtractingBatch(false); }
           }}>
@@ -203,6 +203,12 @@ function ExplorerPanel() {
             <div className="detail-row hash-row"><span>SHA-256 atual</span><code>{selected.sha256}</code></div>
             {selected.extension.toLowerCase() === 'pdf' && <div className="project-link-box">
               <b>Conteúdo do PDF</b>
+              <div className="detail-row"><span>Texto indexado</span><b>{selected.pdf_text_indexed ? 'Sim' : 'Não'}</b></div>
+              {selected.pdf_text_indexed && <>
+                <div className="detail-row"><span>Caracteres extraídos</span><b>{(selected.pdf_text_characters ?? 0).toLocaleString('pt-BR')}</b></div>
+                <div className="detail-row"><span>Páginas do PDF</span><b>{selected.pdf_page_count ?? '—'}</b></div>
+                <div className="detail-row"><span>Última extração</span><b>{formatDate(selected.pdf_extracted_at ?? '', true)}</b></div>
+              </>}
               <button className="secondary-button" disabled={extractingPdf || selected.status !== 'indexed'} onClick={async () => {
                 setExtractingPdf(true); setContentNotice(''); setError('');
                 try {
@@ -211,10 +217,11 @@ function ExplorerPanel() {
                     ? 'PDF sem texto selecionável. Será necessário OCR para pesquisar o conteúdo.'
                     : 'Texto extraído: ' + result.character_count.toLocaleString('pt-BR') + ' caracteres em ' + result.pages_with_text + ' página(s) com texto de ' + result.page_count + '. A pesquisa por conteúdo já pode ser utilizada.');
                   if (!result.needs_ocr) setSearchInContent(true);
+                  await loadFiles();
                 } catch (reason) { setError(String(reason)); }
                 finally { setExtractingPdf(false); }
               }}>
-                {extractingPdf ? 'Extraindo texto...' : 'Extrair texto deste PDF'}
+                {extractingPdf ? 'Extraindo texto...' : selected.pdf_text_indexed ? 'Atualizar texto extraído' : 'Extrair texto deste PDF'}
               </button>
               {contentNotice && <small role="status">{contentNotice}</small>}
               <small>O arquivo original não é alterado. PDFs digitalizados precisam de OCR.</small>
