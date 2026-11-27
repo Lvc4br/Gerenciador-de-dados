@@ -735,6 +735,12 @@ fn review_filename_suggestion(
 }
 
 #[tauri::command]
+fn apply_accepted_filename_suggestion(app: tauri::AppHandle, id: i64) -> Result<(), String> {
+    let connection = open_database(&app)?;
+    suggestions::apply_accepted(&connection, id)
+}
+
+#[tauri::command]
 fn list_projects(
     app: tauri::AppHandle,
     search: Option<String>,
@@ -834,7 +840,7 @@ fn set_project_file_link(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![scan_folder, get_dashboard_stats, create_database_backup, restore_database_backup, list_files, list_file_versions, list_discrepancies, list_filename_suggestions, review_filename_suggestion, list_projects, create_project, update_project, archive_project, list_project_roots, set_project_root_link, list_project_disciplines, save_project_discipline, delete_project_discipline, list_project_files, set_project_file_link])
+        .invoke_handler(tauri::generate_handler![scan_folder, get_dashboard_stats, create_database_backup, restore_database_backup, list_files, list_file_versions, list_discrepancies, list_filename_suggestions, review_filename_suggestion, apply_accepted_filename_suggestion, list_projects, create_project, update_project, archive_project, list_project_roots, set_project_root_link, list_project_disciplines, save_project_discipline, delete_project_discipline, list_project_files, set_project_file_link])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar o GED Desktop");
 }
