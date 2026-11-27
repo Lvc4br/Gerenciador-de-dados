@@ -712,6 +712,34 @@ mod backup_tests {
     }
 
     #[test]
+    fn fts_migration_indexes_existing_and_future_files() {
+        let connection = Connection::open_in_memory().expect("open database");
+        connection.execute_batch(
+            "CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY, name TEXT NOT NULL);
+             CREATE TABLE files(id INTEGER PRIMARY KEY, filename TEXT NOT NULL, relative_path TEXT NOT NULL);
+             INSERT INTO files(id, filename, relative_path) VALUES (1, 'Bridge-Plan.dwg', 'AB20A/Bridge-Plan.dwg');"
+        ).expect("create legacy schema");
+
+        apply_fts_migration(&connection).expect("apply FTS migration");
+        let query = build_fts_query("Bridge-Plan").expect("build query");
+        let existing: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM files_fts WHERE files_fts MATCH ?1",
+            params![query], |row| row.get(0)
+        ).expect("search existing row");
+        assert_eq!(existing, 1);
+
+        connection.execute(
+            "INSERT INTO files(id, filename, relative_path) VALUES (2, 'Road-Section.pdf', 'AB20A/Road-Section.pdf')",
+            []
+        ).expect("insert new row");
+        let future: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM files_fts WHERE files_fts MATCH 'Road*'",
+            [], |row| row.get(0)
+        ).expect("search inserted row");
+        assert_eq!(future, 1);
+    }
+
+    #[test]
     fn sqlite_online_backup_preserves_schema_and_rows() {
         let source = Connection::open_in_memory().expect("open source");
         source.execute_batch(
