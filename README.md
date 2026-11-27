@@ -84,7 +84,7 @@ A branch `feature/mvp-core-indexer` contém:
 - Explorador conectado ao banco, com pesquisa por nome/caminho, filtro de extensão, ordenação, paginação e propriedades;
 - importação dos dois esquemas CSV reconhecidos da amostra;
 - tela de consulta de divergências importadas, com origem e linha do CSV;
-- reimportação CSV com limpeza de linhas excedentes e reconciliação quando o esquema da fonte muda;
+- reimportação CSV transacional com savepoint, limpeza de linhas excedentes e reconciliação quando o esquema da fonte muda;
 - núcleo Python inicial e testes do scanner, ainda não integrado ao desktop como sidecar.
 
 **Ainda não é uma versão pronta para uso ou distribuição.** A execução da varredura já foi retirada da thread da interface, mas ainda não há barra de progresso nem cancelamento. Não há build Windows aprovado nem instalador validado. A leitura direta de DWG/PDF/Office, visualizadores, versões imutáveis, busca FTS5, exportações completas e auditoria operacional ainda precisam ser implementadas.
