@@ -574,6 +574,10 @@ struct FileRecord {
     root_path: String,
     status: String,
     content_snippet: Option<String>,
+    pdf_text_indexed: bool,
+    pdf_text_characters: Option<i64>,
+    pdf_page_count: Option<i64>,
+    pdf_extracted_at: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -652,7 +656,11 @@ fn list_files(
                   SELECT snippet(document_text_fts,0,'[',']',' … ',18)
                   FROM document_text_fts
                   WHERE document_text_fts MATCH ?2 AND rowid=f.id
-                ) ELSE NULL END
+                ) ELSE NULL END,
+                EXISTS(SELECT 1 FROM extracted_document_text x WHERE x.file_id=f.id AND x.sha256=f.sha256),
+                (SELECT x.character_count FROM extracted_document_text x WHERE x.file_id=f.id AND x.sha256=f.sha256),
+                (SELECT x.page_count FROM extracted_document_text x WHERE x.file_id=f.id AND x.sha256=f.sha256),
+                (SELECT x.extracted_at FROM extracted_document_text x WHERE x.file_id=f.id AND x.sha256=f.sha256)
          FROM files f JOIN scan_roots r ON r.id = f.root_id
          WHERE (?1 = '' OR
            (?2 != '' AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?2)) OR
@@ -697,6 +705,10 @@ fn list_files(
             root_path: row.get(7)?,
             status: row.get(8)?,
             content_snippet: row.get(9)?,
+            pdf_text_indexed: row.get(10)?,
+            pdf_text_characters: row.get(11)?,
+            pdf_page_count: row.get(12)?,
+            pdf_extracted_at: row.get(13)?,
         })
     ).map_err(|e| e.to_string())?;
     let mut items = Vec::new();
