@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::{fs, path::PathBuf};
 
 fn main() {
     // Keep a small, deterministic Windows icon in source code so clean CI
@@ -15,9 +15,12 @@ fn main() {
         0x00, 0x2f, 0xfa, 0x15, 0x30, 0x15, 0x00, 0x07, 0x04, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e,
         0x44, 0xae, 0x42, 0x60, 0x82,
     ];
-    let icon_dir = Path::new("icons");
-    fs::create_dir_all(icon_dir).expect("could not create Tauri icons directory");
+
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let icon_dir = manifest_dir.join("icons");
+    fs::create_dir_all(&icon_dir).expect("could not create Tauri icons directory");
     fs::write(icon_dir.join("icon.ico"), ICON).expect("could not write Windows icon");
+
     println!("cargo:rerun-if-changed=build.rs");
     tauri_build::build()
 }
