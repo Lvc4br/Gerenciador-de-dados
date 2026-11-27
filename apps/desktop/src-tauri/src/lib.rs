@@ -4,7 +4,7 @@ use rusqlite::{params, Connection};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{fs::File, io::Read, path::{Path, PathBuf}};
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use walkdir::WalkDir;
 
 const MAX_FILE_SIZE: u64 = 2 * 1024 * 1024 * 1024;
@@ -18,6 +18,15 @@ struct ScanSummary {
     missing: u64,
     reconciliation_complete: bool,
     duplicate_hash_groups: u64,
+}
+
+#[derive(Serialize, Clone)]
+struct ScanProgress {
+    root: String,
+    visited: u64,
+    indexed: u64,
+    skipped: u64,
+    errors: u64,
 }
 
 #[derive(Serialize)]
@@ -115,6 +124,7 @@ fn scan_folder_blocking(app: tauri::AppHandle, folder: String) -> Result<ScanSum
     let mut indexed = 0u64;
     let mut skipped = 0u64;
     let mut errors = 0u64;
+    let mut visited = 0u64;
     let mut traversal_errors = 0u64;
 
     for entry_result in WalkDir::new(&root).follow_links(false) {
@@ -123,6 +133,13 @@ fn scan_folder_blocking(app: tauri::AppHandle, folder: String) -> Result<ScanSum
             Err(_) => { errors += 1; traversal_errors += 1; continue; }
         };
         if !entry.file_type().is_file() { continue; }
+        visited += 1;
+        if visited == 1 || visited % 100 == 0 {
+            let _ = app.emit("scan-progress", ScanProgress {
+                root: root.to_string_lossy().to_string(),
+                visited, indexed, skipped, errors
+            });
+        }
         let path = entry.path();
         let metadata = match path.metadata() {
             Ok(value) => value,
