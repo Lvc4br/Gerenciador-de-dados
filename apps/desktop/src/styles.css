@@ -40,3 +40,23 @@
 .file-status.missing { background: #fff0ed; color: #a43c2e; }
 .file-status.skipped { background: #f2f0e9; color: #6e6242; }
 .file-status.error { background: #fff0ed; color: #a43c2e; }
+
+
+.version-history {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border, #e7e9ee);
+}
+.version-history .details-heading { justify-content: flex-start; gap: 8px; }
+.version-history .details-heading span { margin-left: auto; color: var(--muted, #7b8190); font-size: 12px; }
+.version-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border, #e7e9ee);
+  font-size: 12px;
+}
+.version-item > div { display: flex; flex-direction: column; gap: 3px; }
+.version-item small { color: var(--muted, #7b8190); }
+.version-item code { grid-column: 1 / -1; overflow-wrap: anywhere; color: var(--muted, #7b8190); font-size: 10px; }
