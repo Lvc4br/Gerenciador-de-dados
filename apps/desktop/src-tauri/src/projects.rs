@@ -76,8 +76,10 @@ pub fn list(connection: &Connection, search: &str, status: &str, limit: u32, off
     let mut statement = connection.prepare(
         "SELECT p.id,p.code,p.name,p.client,p.description,p.status,
            (SELECT COUNT(*) FROM project_roots pr WHERE pr.project_id=p.id),
-           (SELECT COUNT(*) FROM files f JOIN project_roots pr ON pr.root_id=f.root_id
-             WHERE pr.project_id=p.id AND f.status='indexed'),
+           (SELECT COUNT(DISTINCT f.id) FROM files f
+             LEFT JOIN project_roots pr ON pr.root_id=f.root_id AND pr.project_id=p.id
+             LEFT JOIN project_file_links pfl ON pfl.file_id=f.id AND pfl.project_id=p.id
+             WHERE f.status='indexed' AND (pr.project_id IS NOT NULL OR pfl.project_id IS NOT NULL)),
            p.created_at,p.updated_at
          FROM projects p
          WHERE (?1 = '' OR p.code LIKE ?2 ESCAPE '\\' OR p.name LIKE ?2 ESCAPE '\\' OR p.client LIKE ?2 ESCAPE '\\')
