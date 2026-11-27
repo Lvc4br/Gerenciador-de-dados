@@ -1,21 +1,46 @@
 # GED — Gerenciador de Engenharia e Documentos
 
-Plataforma para organizar, localizar, analisar, comparar e reutilizar projetos anteriores de engenharia, com foco inicial em engenharia civil e documentação técnica.
+Aplicativo **desktop para Windows**, distribuído como instalador e executável `.exe`, para organizar, localizar, analisar, comparar e reutilizar projetos anteriores de engenharia civil.
 
-> **Objetivo:** transformar arquivos históricos dispersos em uma base documental pesquisável, rastreável e confiável para apoiar engenheiros na localização de referências e na análise de documentos.
+> **Objetivo:** transformar arquivos históricos dispersos em uma base documental local, pesquisável, rastreável e confiável para apoiar engenheiros.
+
+## Produto e plataforma
+
+O GED é um programa instalado no computador do usuário. A operação principal deve funcionar **offline**, sem depender de navegador, servidor remoto ou conexão com a internet. Acesso a pastas locais, discos externos e compartilhamentos de rede será parte central do produto.
+
+A arquitetura também deve permitir, futuramente, sincronização opcional com um servidor corporativo para equipes e múltiplos computadores. Essa evolução não pode ser requisito para o MVP.
 
 ## Visão do produto
 
-O GED não é apenas um gerenciador de arquivos. É um sistema de inteligência documental que combina:
-- Explorador de arquivos familiar, com navegação em árvore, breadcrumbs, visualização rápida e painel de propriedades.
-- Importação em lote e indexação de documentos heterogêneos.
+- Explorador semelhante ao Windows Explorer, com árvore de pastas, breadcrumbs, lista/grade, preview e propriedades.
+- Importação/indexação de pastas inteiras e discos, sem modificar os originais.
 - Extração de metadados de arquivos, carimbos, textos, tabelas e propriedades CAD/BIM.
-- Classificação automática assistida e taxonomia configurável.
-- Busca textual, filtros facetados, busca por similaridade e recomendações explicáveis.
-- Detecção de divergências, duplicidades, lacunas e conflitos entre metadados e documentos relacionados.
+- Classificação assistida e taxonomia configurável.
+- Busca textual, filtros, similaridade técnica e recomendações explicáveis.
+- Detecção de divergências, duplicidades, lacunas e conflitos.
 - Comparação de revisões e emissão de relatórios.
-- Exportação de arquivos originais, metadados, resultados de pesquisa e pacotes documentais.
-- Controle de acesso, auditoria, preservação dos originais e rastreabilidade.
+- Exportação de originais, metadados, resultados e pacotes.
+- Banco de dados local, backup, auditoria e controle de acesso local.
+
+## Stack desktop recomendada
+
+| Camada | Tecnologia |
+|---|---|
+| Aplicativo Windows | Tauri 2 |
+| Interface | React + TypeScript |
+| Estilo e componentes | Tailwind CSS + componentes acessíveis |
+| Núcleo de processamento | Python empacotado como sidecar (PyInstaller) |
+| Comunicação UI/núcleo | Tauri commands + IPC local restrito |
+| Banco local | SQLite + FTS5; migrações via SQLAlchemy/Alembic ou equivalente |
+| Busca semântica | Índice vetorial local opcional, com fallback semântico/lexical |
+| Arquivos | Sistema de arquivos local; originais preservados no local escolhido |
+| Filas | SQLite job queue / worker local; Redis não é obrigatório no desktop |
+| PDF e imagens | PDF.js e bibliotecas de imagem |
+| CAD/BIM | Adaptadores isolados; validar SDK, versão e licença |
+| Empacotamento | Tauri bundler + instalador Windows (.msi/.exe) |
+| Testes | Pytest, Vitest e Playwright/Webdriver conforme camada |
+
+**Por que Tauri:** entrega uma aplicação desktop leve, com interface web moderna e acesso controlado a recursos nativos. Python fica responsável pelo ecossistema de extração documental e engenharia. O sidecar será empacotado junto ao aplicativo; o usuário não precisará instalar Python.
 
 ## Evidência inicial: conjunto AB20A
 
@@ -30,27 +55,12 @@ A amostra demonstra um caso de uso concreto: conferir se o identificador do arqu
 
 ## Documentação
 
-- [Arquitetura](docs/ARCHITECTURE.md)
-- [Modelo de dados e schema SQL](docs/DATA_MODEL.md)
-- [Experiência e layout da interface](docs/UX.md)
-- [Plano de desenvolvimento e critérios de aceite](docs/ROADMAP.md)
-- [Matriz inicial de formatos](docs/FORMAT_SUPPORT.md)
-
-## Stack recomendada
-
-| Camada | Tecnologia |
-|---|---|
-| Frontend | React + TypeScript |
-| UI | Tailwind CSS + biblioteca acessível de componentes |
-| Backend | Python + FastAPI |
-| Banco transacional | PostgreSQL |
-| Busca textual/facetas | OpenSearch (fase de escala; PostgreSQL no MVP) |
-| Busca vetorial | pgvector |
-| Arquivos | S3 compatível / MinIO |
-| Filas | Celery + Redis |
-| Visualização | PDF.js; visualizadores CAD/BIM por adaptadores |
-| Infraestrutura | Docker Compose no desenvolvimento; implantação conteinerizada |
-| Testes | Pytest, testes de contrato e Playwright |
+- [Arquitetura desktop](docs/ARCHITECTURE.md)
+- [Modelo de dados e schema](docs/DATA_MODEL.md)
+- [Experiência e layout](docs/UX.md)
+- [Plano de desenvolvimento](docs/ROADMAP.md)
+- [Matriz de formatos](docs/FORMAT_SUPPORT.md)
+- [Backend e comunicação local](docs/API_AND_BACKEND.md)
 
 ## Princípios não negociáveis
 
@@ -61,14 +71,16 @@ A amostra demonstra um caso de uso concreto: conferir se o identificador do arqu
 5. Não sobrescrever revisões: cada versão é imutável e ligada à anterior quando possível.
 6. Permitir correção humana, registrar quem corrigiu e preservar o valor extraído.
 7. Respeitar licenças de bibliotecas, conversores e formatos proprietários.
-8. Aplicar autorização no backend, não apenas esconder ações na interface.
-9. Exportar sempre com manifesto, origem e trilha de auditoria quando aplicável.
+8. Restringir acesso a arquivos locais aos diretórios autorizados pelo usuário.
+9. Exportar com manifesto, origem e trilha de auditoria quando aplicável.
 10. Tratar arquivos não suportados ou corrompidos como falhas explícitas, nunca como sucesso silencioso.
+11. Operações essenciais devem funcionar offline.
+12. Não enviar documentos para serviços externos/IA em nuvem sem consentimento explícito.
 
 ## Estado
 
-Este repositório contém a especificação inicial e a arquitetura de referência. O produto ainda precisa ser implementado e validado com usuários, arquivos reais e regras de engenharia da organização.
+Este repositório contém a especificação inicial. O aplicativo executável ainda precisa ser implementado, empacotado e validado em máquinas Windows e com arquivos reais.
 
 ## Próximo passo
 
-Implementar o MVP vertical: autenticação, cadastro de projeto, upload em lote, armazenamento imutável, extração de metadados CSV/PDF, explorador, busca e relatório de divergências.
+Implementar o MVP vertical desktop: shell Tauri, interface Explorer, sidecar Python, banco SQLite, indexação de pastas, leitura CSV/PDF e relatório de divergências usando a amostra AB20A.
