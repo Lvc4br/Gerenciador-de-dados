@@ -1171,6 +1171,27 @@ mod backup_tests {
     }
 
     #[test]
+    fn pdf_metadata_candidates_detect_drawing_revision_and_title() {
+        let text = "Número do desenho: EST-001\nRevisão: REV02\nTítulo: Planta de formas do tabuleiro";
+        let (drawing, revision, title, confidence) =
+            extract_pdf_metadata_candidates(text).expect("parse PDF metadata");
+        assert_eq!(drawing.as_deref(), Some("EST-001"));
+        assert_eq!(revision.as_deref(), Some("02"));
+        assert_eq!(title.as_deref(), Some("Planta de formas do tabuleiro"));
+        assert_eq!(confidence, 0.86);
+    }
+
+    #[test]
+    fn pdf_metadata_candidates_do_not_treat_iso_standard_as_drawing_number() {
+        let (drawing, revision, title, confidence) =
+            extract_pdf_metadata_candidates("Norma ISO-9001 e texto genérico").expect("parse PDF metadata");
+        assert_eq!(drawing, None);
+        assert_eq!(revision, None);
+        assert_eq!(title, None);
+        assert_eq!(confidence, 0.0);
+    }
+
+    #[test]
     fn document_text_migration_indexes_and_updates_pdf_content() {
         let connection = Connection::open_in_memory().expect("open database");
         connection.execute_batch(
@@ -1179,6 +1200,7 @@ mod backup_tests {
         ).expect("create legacy schema");
         apply_document_text_migration(&connection).expect("apply document text migration");
         apply_pdf_page_count_migration(&connection).expect("apply PDF page count migration");
+        apply_pdf_metadata_migration(&connection).expect("apply PDF metadata migration");
         connection.execute(
             "INSERT INTO files(id,filename,relative_path) VALUES (1,'memorial.pdf','memorial.pdf')", []
         ).expect("insert file");
