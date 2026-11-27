@@ -5,8 +5,17 @@ description = "Gerenciador de Engenharia e Documentos"
 authors = ["GED"]
 edition = "2021"
 
+[lib]
+name = "ged_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+rusqlite = { version = "0.32", features = ["bundled"] }
+walkdir = "2"
+sha2 = "0.10"
+serde = { version = "1", features = ["derive"] }
