@@ -219,5 +219,7 @@ O maior risco neste momento não é escolher outra linguagem. É ampliar funcion
 - O banco SQLite agora registra as migrações aplicadas em `schema_migrations`, com baseline para bancos existentes e uma segunda migração de índices voltados à consulta do catálogo.
 - A migração de índices é transacional e idempotente; a abertura do GED continua compatível com bancos criados por versões anteriores do MVP.
 - A criação de backup agora verifica também as relações por `PRAGMA foreign_key_check`; a cópia de segurança pré-restauração usa timestamp em milissegundos para reduzir colisões de nome.
-- FTS5 ainda não está implementado. Antes de ativá-lo, será necessário validar a compilação SQLite usada no instalador Windows e medir tamanho do índice, tempo de indexação e desempenho em hardware modesto.
+- FTS5 foi integrado ao catálogo de arquivos por migração versionada, com gatilhos para manter o índice sincronizado e reconstrução dos registros existentes. A validação da compilação SQLite no Windows e os benchmarks de tamanho, indexação e consulta em hardware modesto continuam pendentes.
 - Não há ainda teste funcional de migração com banco legado real nem execução confirmada do CI para este commit.
+
+- A pesquisa do Explorador passou a usar FTS5 para termos com pelo menos dois caracteres; consultas curtas mantêm fallback LIKE para preservar a busca simples.
