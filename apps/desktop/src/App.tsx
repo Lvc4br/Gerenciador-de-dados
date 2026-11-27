@@ -30,6 +30,7 @@ type FileRecord = {
   byte_size: number; modified_at: string; sha256: string; root_path: string; status: string;
 };
 type FilePage = { items: FileRecord[]; total: number };
+type FileVersion = { id: number; sha256: string; byte_size: number; modified_at: string; captured_at: string };
 
 function formatDate(value: string, includeTime = false) {
   if (!value) return '—';
@@ -53,6 +54,8 @@ function ExplorerPanel() {
   const [page, setPage] = useState(0);
   const [data, setData] = useState<FilePage>({ items: [], total: 0 });
   const [selected, setSelected] = useState<FileRecord | null>(null);
+  const [versions, setVersions] = useState<FileVersion[]>([]);
+  const [loadingVersions, setLoadingVersions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const pageSize = 100;
@@ -71,6 +74,17 @@ function ExplorerPanel() {
   }
 
   useEffect(() => { void loadFiles(); }, [search, extension, sortBy, ascending, page]);
+
+  useEffect(() => {
+    let active = true;
+    if (!selected) { setVersions([]); return; }
+    setLoadingVersions(true);
+    invoke<FileVersion[]>('list_file_versions', { fileId: selected.id })
+      .then(result => { if (active) setVersions(result); })
+      .catch(() => { if (active) setVersions([]); })
+      .finally(() => { if (active) setLoadingVersions(false); });
+    return () => { active = false; };
+  }, [selected?.id]);
 
   const totalPages = Math.max(1, Math.ceil(data.total / pageSize));
   return (
@@ -112,8 +126,17 @@ function ExplorerPanel() {
             <div className="detail-row"><span>Extensão</span><b>{selected.extension || '—'}</b></div>
             <div className="detail-row"><span>Tamanho</span><b>{formatBytes(selected.byte_size)}</b></div>
             <div className="detail-row"><span>Modificado</span><b>{formatDate(selected.modified_at, true)}</b></div>
-            <div className="detail-row hash-row"><span>SHA-256</span><code>{selected.sha256}</code></div>
-            <p className="detail-note">Os dados acima foram registrados na indexação. A visualização do conteúdo e a extração de metadados serão adicionadas em uma próxima etapa.</p>
+            <div className="detail-row hash-row"><span>SHA-256 atual</span><code>{selected.sha256}</code></div>
+            <div className="version-history">
+              <div className="details-heading"><Clock3 size={16} /><b>Histórico de versões</b><span>{loadingVersions ? 'Carregando...' : versions.length}</span></div>
+              {versions.length === 0 && !loadingVersions && <p className="detail-note">Nenhuma versão registrada. Execute uma nova indexação para registrar o conteúdo atual.</p>}
+              {versions.map((version, index) => <div className="version-item" key={version.id}>
+                <div><b>{index === 0 ? 'Versão mais recente' : `Versão ${versions.length - index}`}</b><small>{formatDate(version.captured_at, true)}</small></div>
+                <span>{formatBytes(version.byte_size)}</span>
+                <code>{version.sha256}</code>
+              </div>)}
+            </div>
+            <p className="detail-note">O GED registra uma entrada por conteúdo SHA-256 distinto. O arquivo original permanece no local de origem; esta função ainda não armazena uma cópia física de cada versão.</p>
           </> : <p className="detail-note">Selecione um arquivo na lista para consultar suas propriedades.</p>}
         </aside>
       </div>
