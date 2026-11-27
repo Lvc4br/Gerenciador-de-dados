@@ -33,7 +33,7 @@ function formatDate(value: string, includeTime = false) {
   if (!value) return '—';
   const numeric = Number(value);
   const date = new Date(Number.isFinite(numeric) ? numeric * 1000 : value);
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('pt-BR', includeTime ? { dateStyle: 'short', timeStyle: 'short' } : { dateStyle: 'short' });
+  return Number.isNaN(date.getTime()) ? '—' : (includeTime ? date.toLocaleString('pt-BR') : date.toLocaleDateString('pt-BR'));
 }
 
 function formatBytes(bytes: number) {
