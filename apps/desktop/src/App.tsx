@@ -232,6 +232,122 @@ function DiscrepanciesPanel() {
   );
 }
 
+
+type ProjectRecord = {
+  id: number; code: string; name: string; client: string; description: string;
+  status: string; root_count: number; file_count: number; created_at: string; updated_at: string;
+};
+type ProjectRoot = { id: number; path: string; added_at: string; linked: boolean };
+
+function ProjectsPanel() {
+  const [projects, setProjects] = useState<ProjectRecord[]>([]);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("active");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [client, setClient] = useState("");
+  const [description, setDescription] = useState("");
+  const [selected, setSelected] = useState<ProjectRecord | null>(null);
+  const [roots, setRoots] = useState<ProjectRoot[]>([]);
+
+  async function loadProjects() {
+    setLoading(true); setError("");
+    try {
+      const result = await invoke<{items: ProjectRecord[]; total: number}>("list_projects", { search, status, limit: 100, offset: 0 });
+      setProjects(result.items);
+      setSelected(current => current ? result.items.find(p => p.id === current.id) ?? null : null);
+    } catch (reason) { setError(String(reason)); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { void loadProjects(); }, [search, status]);
+
+  async function selectProject(project: ProjectRecord) {
+    setSelected(project); setError("");
+    try { setRoots(await invoke<ProjectRoot[]>("list_project_roots", { projectId: project.id })); }
+    catch (reason) { setRoots([]); setError(String(reason)); }
+  }
+  async function createProject(event: React.FormEvent) {
+    event.preventDefault(); setError(""); setNotice("");
+    try {
+      await invoke<number>("create_project", { code, name, client, description });
+      setCode(""); setName(""); setClient(""); setDescription(""); setCreating(false);
+      setNotice("Projeto cadastrado no banco local.");
+      await loadProjects();
+    } catch (reason) { setError(String(reason)); }
+  }
+  async function toggleArchive(project: ProjectRecord) {
+    const archived = project.status !== "archived";
+    try {
+      await invoke<void>("archive_project", { id: project.id, archived });
+      setNotice(archived ? "Projeto arquivado. Os documentos foram preservados." : "Projeto reativado.");
+      await loadProjects();
+    } catch (reason) { setError(String(reason)); }
+  }
+  async function toggleRoot(root: ProjectRoot) {
+    if (!selected) return;
+    try {
+      await invoke<void>("set_project_root_link", { projectId: selected.id, rootId: root.id, linked: !root.linked });
+      await selectProject(selected);
+      await loadProjects();
+    } catch (reason) { setError(String(reason)); }
+  }
+
+  return (
+    <section className="explorer">
+      <div className="page-heading explorer-heading">
+        <div><div className="eyebrow">CATÁLOGO LOCAL</div><h1>Projetos</h1><p>Cadastre projetos e associe pastas já indexadas sem duplicar arquivos.</p></div>
+        <button className="primary-button" onClick={() => setCreating(value => !value)}><Folder size={16} /> {creating ? "Cancelar" : "Novo projeto"}</button>
+      </div>
+      {notice && <div className="notice" role="status">{notice}</div>}
+      {error && <div className="notice error" role="alert">{error}</div>}
+      {creating && <form className="surface-card project-form" onSubmit={createProject}>
+        <div className="card-heading"><div><h3>Novo projeto</h3><p>Os dados serão salvos no SQLite local.</p></div></div>
+        <div className="project-form-grid">
+          <label>Código *<input required maxLength={40} value={code} onChange={e => setCode(e.target.value)} placeholder="Ex.: AB20A" /></label>
+          <label>Nome do projeto *<input required maxLength={180} value={name} onChange={e => setName(e.target.value)} placeholder="Nome do empreendimento" /></label>
+          <label>Cliente<input value={client} onChange={e => setClient(e.target.value)} placeholder="Cliente / contratante" /></label>
+          <label>Descrição<input value={description} onChange={e => setDescription(e.target.value)} placeholder="Descrição breve (opcional)" /></label>
+        </div>
+        <div className="dashboard-actions"><button className="primary-button" type="submit">Salvar projeto</button><button className="secondary-button" type="button" onClick={() => setCreating(false)}>Cancelar</button></div>
+      </form>}
+      <div className="explorer-toolbar">
+        <label className="explorer-search"><Search size={16} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por código, nome ou cliente..." /></label>
+        <label className="filter-control"><span>Situação</span><select value={status} onChange={e => setStatus(e.target.value)}><option value="active">Ativos</option><option value="archived">Arquivados</option><option value="all">Todos</option></select></label>
+      </div>
+      <div className="explorer-layout project-layout">
+        <div className="file-table-wrap">
+          <div className="explorer-summary"><span>{loading ? "Carregando projetos..." : projects.length + " projeto(s)"}</span><span>Banco SQLite local</span></div>
+          <table className="file-table"><thead><tr><th>Código / Projeto</th><th>Cliente</th><th>Pastas</th><th>Documentos</th><th>Situação</th></tr></thead>
+            <tbody>{projects.map(project => <tr key={project.id} className={selected?.id === project.id ? "selected" : ""} onClick={() => void selectProject(project)}>
+              <td><div className="file-name"><Folder size={16} /><div><b>{project.code}</b><small>{project.name}</small></div></div></td>
+              <td>{project.client || "—"}</td><td>{project.root_count}</td><td>{project.file_count.toLocaleString("pt-BR")}</td>
+              <td><span className={project.status === "active" ? "file-status indexed" : "file-status missing"}>{project.status === "active" ? "Ativo" : "Arquivado"}</span></td>
+            </tr>)}
+            {!loading && projects.length === 0 && <tr><td colSpan={5} className="table-empty">Nenhum projeto encontrado. Cadastre o primeiro projeto para começar.</td></tr>}</tbody>
+          </table>
+        </div>
+        <aside className="file-details">
+          <div className="details-heading"><Folder size={18} /><b>Detalhes do projeto</b></div>
+          {selected ? <>
+            <h3>{selected.code} — {selected.name}</h3>
+            <div className="detail-row"><span>Cliente</span><b>{selected.client || "—"}</b></div>
+            <div className="detail-row"><span>Descrição</span><b>{selected.description || "—"}</b></div>
+            <div className="detail-row"><span>Documentos vinculados</span><b>{selected.file_count}</b></div>
+            <div className="details-heading"><b>Pastas indexadas disponíveis</b></div>
+            {roots.length === 0 ? <p className="detail-note">Nenhuma pasta indexada foi encontrada. Importe uma pasta pela Visão geral primeiro.</p> : roots.map(root => <label className="project-root-option" key={root.id}><input type="checkbox" checked={root.linked} onChange={() => void toggleRoot(root)} /><span>{root.path}</span></label>)}
+            <button className="secondary-button" onClick={() => void toggleArchive(selected)}>{selected.status === "active" ? "Arquivar projeto" : "Reativar projeto"}</button>
+            <p className="detail-note">Arquivar não exclui arquivos nem remove a indexação. Uma pasta pode ser compartilhada entre projetos.</p>
+          </> : <p className="detail-note">Selecione um projeto para consultar seus dados e vincular pastas já indexadas.</p>}
+        </aside>
+      </div>
+    </section>
+  );
+}
+
 function App() {
   const [section, setSection] = useState<Section>("Visão geral");
   const [query, setQuery] = useState("");
@@ -355,7 +471,7 @@ function App() {
 
         <div className="page-content">
           {isPreviewMode && <div className="preview-banner"><b>PRÉVIA VISUAL</b><span>Dados demonstrativos. Indexação, backup e restauração reais exigem o aplicativo desktop.</span></div>}
-          {section === "Explorador" ? (<ExplorerPanel />) : section === "Divergências" ? (<DiscrepanciesPanel />) : section === "Visão geral" ? (
+          {section === "Projetos" ? (<ProjectsPanel />) : section === "Explorador" ? (<ExplorerPanel />) : section === "Divergências" ? (<DiscrepanciesPanel />) : section === "Visão geral" ? (
             <>
               <div className="page-heading">
                 <div><div className="eyebrow">CENTRAL DE CONTROLE</div><h1>Visão geral</h1><p>Encontre, organize e analise o conhecimento dos projetos da sua engenharia.</p></div>
