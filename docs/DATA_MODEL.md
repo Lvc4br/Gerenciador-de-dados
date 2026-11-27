@@ -2,7 +2,7 @@
 
 ## 0. Banco da aplicação desktop
 
-No MVP Windows, o banco efetivo será **SQLite local**, armazenado no diretório de dados do usuário, fora da pasta de instalação. Usar foreign keys, WAL quando apropriado, FTS5, índices e migrações versionadas. O conteúdo binário dos documentos permanece nos caminhos originais ou na biblioteca local gerenciada; o banco guarda referências, hashes e metadados.
+No MVP Windows, o banco efetivo será **SQLite local**, armazenado no diretório de dados do usuário, fora da pasta de instalação. Usar foreign keys, WAL quando apropriado, FTS5, índices e migrações versionadas. O GED registra versões aplicadas em `schema_migrations`; a migração inicial de compatibilidade e os índices básicos do catálogo já estão registrados no código desktop. O conteúdo binário dos documentos permanece nos caminhos originais ou na biblioteca local gerenciada; o banco guarda referências, hashes e metadados.
 
 O schema PostgreSQL apresentado adiante deve ser entendido como **referência para uma futura edição corporativa/sincronizada**, não como dependência do executável inicial. O modelo lógico é compartilhado, mas as migrações SQLite precisam adaptar tipos (UUID, JSON, timestamps), índices, FTS5 e constraints às capacidades do SQLite. Não exigir PostgreSQL, Redis, MinIO ou conexão com servidor para instalar e usar o MVP.
 
