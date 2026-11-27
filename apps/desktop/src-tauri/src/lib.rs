@@ -79,7 +79,17 @@ fn open_database(app: &tauri::AppHandle) -> Result<Connection, String> {
          );
          CREATE INDEX IF NOT EXISTS idx_files_sha256 ON files(sha256);
          CREATE INDEX IF NOT EXISTS idx_files_extension ON files(extension);
-         CREATE INDEX IF NOT EXISTS idx_files_filename ON files(filename);"
+         CREATE INDEX IF NOT EXISTS idx_files_filename ON files(filename);
+         CREATE TABLE IF NOT EXISTS file_versions (
+           id INTEGER PRIMARY KEY AUTOINCREMENT,
+           file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+           sha256 TEXT NOT NULL,
+           byte_size INTEGER NOT NULL,
+           modified_at TEXT NOT NULL,
+           captured_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+           UNIQUE(file_id, sha256)
+         );
+         CREATE INDEX IF NOT EXISTS idx_file_versions_file ON file_versions(file_id, captured_at DESC);"
     ).map_err(|e| e.to_string())?;
     let has_last_seen: i64 = connection.query_row(
         "SELECT COUNT(*) FROM pragma_table_info('files') WHERE name='last_seen_scan_id'",
@@ -182,6 +192,15 @@ fn scan_folder_blocking(app: tauri::AppHandle, folder: String) -> Result<ScanSum
              last_seen_scan_id=excluded.last_seen_scan_id",
             params![root_id, relative, filename, extension, metadata.len() as i64, modified, hash, scan_id]
         ).is_ok() {
+            let file_id: i64 = transaction.query_row(
+                "SELECT id FROM files WHERE root_id=?1 AND relative_path=?2",
+                params![root_id, relative], |row| row.get(0)
+            ).map_err(|e| e.to_string())?;
+            transaction.execute(
+                "INSERT OR IGNORE INTO file_versions(file_id,sha256,byte_size,modified_at)
+                 VALUES (?1,?2,?3,?4)",
+                params![file_id, hash, metadata.len() as i64, modified]
+            ).map_err(|e| e.to_string())?;
             indexed += 1;
             if extension == "csv" {
                 match transaction.query_row(
