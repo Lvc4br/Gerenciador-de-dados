@@ -30,6 +30,31 @@ CREATE TABLE IF NOT EXISTS files (
 CREATE INDEX IF NOT EXISTS idx_files_sha256 ON files(sha256);
 CREATE INDEX IF NOT EXISTS idx_files_extension ON files(extension);
 CREATE INDEX IF NOT EXISTS idx_files_filename ON files(filename);
+CREATE TABLE IF NOT EXISTS extracted_document_text (
+    file_id INTEGER PRIMARY KEY REFERENCES files(id) ON DELETE CASCADE,
+    sha256 TEXT NOT NULL,
+    content TEXT NOT NULL,
+    page_count INTEGER NOT NULL,
+    pages_with_text INTEGER NOT NULL,
+    character_count INTEGER NOT NULL,
+    parser TEXT NOT NULL,
+    extracted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE VIRTUAL TABLE IF NOT EXISTS document_text_fts USING fts5(
+    content, content='extracted_document_text', content_rowid='file_id'
+);
+CREATE TRIGGER IF NOT EXISTS extracted_text_ai AFTER INSERT ON extracted_document_text BEGIN
+    INSERT INTO document_text_fts(rowid, content) VALUES (new.file_id, new.content);
+END;
+CREATE TRIGGER IF NOT EXISTS extracted_text_ad AFTER DELETE ON extracted_document_text BEGIN
+    INSERT INTO document_text_fts(document_text_fts, rowid, content)
+    VALUES ('delete', old.file_id, old.content);
+END;
+CREATE TRIGGER IF NOT EXISTS extracted_text_au AFTER UPDATE ON extracted_document_text BEGIN
+    INSERT INTO document_text_fts(document_text_fts, rowid, content)
+    VALUES ('delete', old.file_id, old.content);
+    INSERT INTO document_text_fts(rowid, content) VALUES (new.file_id, new.content);
+END;
 CREATE TABLE IF NOT EXISTS filename_suggestions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
