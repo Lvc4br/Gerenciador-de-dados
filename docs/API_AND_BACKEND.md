@@ -115,3 +115,5 @@ A aceitação atual registra a decisão, mas não promove os campos para os meta
 - `metadata_audit_log` registra criação/atualização, valores anteriores e novos em JSON, identificador local do ator e data/hora.
 - O botão de aplicação é separado da aceitação. Assim, o engenheiro pode aceitar primeiro e aplicar em outro momento.
 - A aplicação não cria vínculo de projeto, não altera o arquivo original e não substitui os dados importados dos CSVs.
+
+A listagem de sugestões também consulta `drawing_metadata` por nome de arquivo e devolve `titleblock_internal_number`, `titleblock_artesp_number` e `titleblock_title` para conferência lado a lado. Quando não há correspondência importada, esses campos são nulos; isso não é tratado como divergência confirmada.
