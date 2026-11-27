@@ -56,6 +56,8 @@ O aplicativo cria `ged.sqlite3` no diretório de dados da aplicação do usuári
 - Hash SHA-256 para cada arquivo legível.
 - Registro de caminho relativo, extensão, tamanho e data de modificação.
 - Identificação de grupos de arquivos com conteúdo idêntico.
+- Explorador conectado ao banco local com pesquisa por nome/caminho, filtro de extensão, ordenação e paginação.
+- Painel de propriedades com caminho, tipo, tamanho, data de modificação e SHA-256.
 - Preservação dos originais: não há operação de escrita, renomeação ou exclusão nos arquivos indexados.
 
-A indexação inicial não interpreta ainda o conteúdo de DWG, PDF ou Office. Também não classifica automaticamente arquivos como projetos; registra pastas-raiz e arquivos. Esses recursos pertencem às próximas etapas.
+A indexação inicial não interpreta ainda o conteúdo de DWG, PDF ou Office. O Explorador lista os arquivos indexados, mas ainda não abre nem renderiza seu conteúdo. Também não classifica automaticamente arquivos como projetos; registra pastas-raiz e arquivos. Esses recursos pertencem às próximas etapas.
