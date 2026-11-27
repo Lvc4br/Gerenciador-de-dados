@@ -1078,12 +1078,13 @@ mod backup_tests {
              CREATE TABLE files(id INTEGER PRIMARY KEY, filename TEXT NOT NULL, relative_path TEXT NOT NULL);"
         ).expect("create legacy schema");
         apply_document_text_migration(&connection).expect("apply document text migration");
+        apply_pdf_page_count_migration(&connection).expect("apply PDF page count migration");
         connection.execute(
             "INSERT INTO files(id,filename,relative_path) VALUES (1,'memorial.pdf','memorial.pdf')", []
         ).expect("insert file");
         connection.execute(
-            "INSERT INTO extracted_document_text(file_id,sha256,content,character_count,parser_version)
-             VALUES (1,'abc','Estrutura de concreto EST-001',30,'test')", []
+            "INSERT INTO extracted_document_text(file_id,sha256,content,character_count,parser_version,page_count,pages_with_text)
+             VALUES (1,'abc','Estrutura de concreto EST-001',30,'test',2,2)", []
         ).expect("insert extracted text");
         let found: i64 = connection.query_row(
             "SELECT COUNT(*) FROM document_text_fts WHERE document_text_fts MATCH 'EST-001'",
