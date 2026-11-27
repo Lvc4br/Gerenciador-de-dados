@@ -136,8 +136,54 @@ fn open_database(app: &tauri::AppHandle) -> Result<Connection, String> {
         transaction.commit().map_err(|e| e.to_string())?;
     }
 
+    apply_fts_migration(&connection)?;
     csv_metadata::ensure_schema(&connection)?;
     Ok(connection)
+}
+
+fn apply_fts_migration(connection: &Connection) -> Result<(), String> {
+    let already_applied: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM schema_migrations WHERE version=3",
+        [], |row| row.get(0)
+    ).map_err(|e| e.to_string())?;
+    if already_applied > 0 { return Ok(()); }
+
+    let transaction = connection.unchecked_transaction().map_err(|e| e.to_string())?;
+    transaction.execute_batch(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS files_fts USING fts5(
+           filename, relative_path, content='files', content_rowid='id',
+           tokenize='unicode61 remove_diacritics 2'
+         );
+         CREATE TRIGGER IF NOT EXISTS files_fts_ai AFTER INSERT ON files BEGIN
+           INSERT INTO files_fts(rowid, filename, relative_path)
+           VALUES (new.id, new.filename, new.relative_path);
+         END;
+         CREATE TRIGGER IF NOT EXISTS files_fts_ad AFTER DELETE ON files BEGIN
+           INSERT INTO files_fts(files_fts, rowid, filename, relative_path)
+           VALUES ('delete', old.id, old.filename, old.relative_path);
+         END;
+         CREATE TRIGGER IF NOT EXISTS files_fts_au AFTER UPDATE OF filename, relative_path ON files BEGIN
+           INSERT INTO files_fts(files_fts, rowid, filename, relative_path)
+           VALUES ('delete', old.id, old.filename, old.relative_path);
+           INSERT INTO files_fts(rowid, filename, relative_path)
+           VALUES (new.id, new.filename, new.relative_path);
+         END;
+         INSERT INTO files_fts(files_fts) VALUES ('rebuild');"
+    ).map_err(|e| format!("Não foi possível preparar a busca textual FTS5: {e}"))?;
+    transaction.execute(
+        "INSERT INTO schema_migrations(version, name) VALUES (3, 'files_full_text_search')",
+        []
+    ).map_err(|e| e.to_string())?;
+    transaction.commit().map_err(|e| e.to_string())
+}
+
+fn build_fts_query(search: &str) -> Option<String> {
+    let terms: Vec<String> = search.split_whitespace()
+        .map(|term| term.chars().filter(|character| character.is_alphanumeric()).collect::<String>())
+        .filter(|term| term.chars().count() >= 2)
+        .map(|term| format!("\\"{term}\\"*"))
+        .collect();
+    if terms.is_empty() { None } else { Some(terms.join(" AND ")) }
 }
 
 fn hash_file(path: &Path) -> Result<String, String> {
@@ -459,14 +505,17 @@ fn list_files(
     let connection = open_database(&app)?;
     let search = search.unwrap_or_default().trim().to_string();
     let pattern = format!("%{}%", search.replace('%', "\\%").replace('_', "\\_"));
+    let fts_query = build_fts_query(&search).unwrap_or_default();
     let extension = extension.unwrap_or_default().trim().trim_start_matches('.').to_lowercase();
     let extension_filter = if extension.is_empty() { None } else { Some(extension) };
 
     let total: u64 = connection.query_row(
         "SELECT COUNT(*) FROM files f
-         WHERE (?1 = '' OR f.filename LIKE ?2 ESCAPE '\\' OR f.relative_path LIKE ?2 ESCAPE '\\')
-         AND (?3 IS NULL OR lower(f.extension) = ?3)",
-        params![search, pattern, extension_filter],
+         WHERE (?1 = '' OR
+           (?2 != '' AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?2)) OR
+           (?2 = '' AND (f.filename LIKE ?3 ESCAPE '\\' OR f.relative_path LIKE ?3 ESCAPE '\\')))
+         AND (?4 IS NULL OR lower(f.extension) = ?4)",
+        params![search, fts_query, pattern, extension_filter],
         |row| row.get(0)
     ).map_err(|e| e.to_string())?;
 
@@ -482,14 +531,16 @@ fn list_files(
         "SELECT f.id, f.filename, f.relative_path, f.extension, f.byte_size,
                 f.modified_at, f.sha256, r.path, f.status
          FROM files f JOIN scan_roots r ON r.id = f.root_id
-         WHERE (?1 = '' OR f.filename LIKE ?2 ESCAPE '\\' OR f.relative_path LIKE ?2 ESCAPE '\\')
-           AND (?3 IS NULL OR lower(f.extension) = ?3)
+         WHERE (?1 = '' OR
+           (?2 != '' AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?2)) OR
+           (?2 = '' AND (f.filename LIKE ?3 ESCAPE '\\' OR f.relative_path LIKE ?3 ESCAPE '\\')))
+           AND (?4 IS NULL OR lower(f.extension) = ?4)
          ORDER BY {order_column} {direction}
-         LIMIT ?4 OFFSET ?5"
+         LIMIT ?5 OFFSET ?6"
     );
     let mut statement = connection.prepare(&sql).map_err(|e| e.to_string())?;
     let rows = statement.query_map(
-        params![search, pattern, extension_filter, limit.unwrap_or(100).clamp(1, 500), offset.unwrap_or(0)],
+        params![search, fts_query, pattern, extension_filter, limit.unwrap_or(100).clamp(1, 500), offset.unwrap_or(0)],
         |row| Ok(FileRecord {
             id: row.get(0)?,
             filename: row.get(1)?,
@@ -506,7 +557,6 @@ fn list_files(
     for row in rows { items.push(row.map_err(|e| e.to_string())?); }
     Ok(FilePage { items, total })
 }
-
 
 #[derive(Serialize)]
 struct FileVersionRecord {
@@ -632,6 +682,34 @@ pub fn run() {
 #[cfg(test)]
 mod backup_tests {
     use super::*;
+
+    #[test]
+    fn fts_migration_indexes_existing_and_future_files() {
+        let connection = Connection::open_in_memory().expect("open database");
+        connection.execute_batch(
+            "CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY, name TEXT NOT NULL);
+             CREATE TABLE files(id INTEGER PRIMARY KEY, filename TEXT NOT NULL, relative_path TEXT NOT NULL);
+             INSERT INTO files(id, filename, relative_path) VALUES (1, 'Bridge-Plan.dwg', 'AB20A/Bridge-Plan.dwg');"
+        ).expect("create legacy schema");
+
+        apply_fts_migration(&connection).expect("apply FTS migration");
+        let query = build_fts_query("Bridge-Plan").expect("build query");
+        let existing: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM files_fts WHERE files_fts MATCH ?1",
+            params![query], |row| row.get(0)
+        ).expect("search existing row");
+        assert_eq!(existing, 1);
+
+        connection.execute(
+            "INSERT INTO files(id, filename, relative_path) VALUES (2, 'Road-Section.pdf', 'AB20A/Road-Section.pdf')",
+            []
+        ).expect("insert new row");
+        let future: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM files_fts WHERE files_fts MATCH 'Road*'",
+            [], |row| row.get(0)
+        ).expect("search inserted row");
+        assert_eq!(future, 1);
+    }
 
     #[test]
     fn sqlite_online_backup_preserves_schema_and_rows() {
