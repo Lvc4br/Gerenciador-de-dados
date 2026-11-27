@@ -42,8 +42,12 @@
 - Implementado parser conservador de prefixo de projeto, disciplina, número de desenho e revisão.
 - Resultados identificados como sugestões com indicador de confiança e origem `filename`.
 - Comando local de diagnóstico: `ged-indexer analyze-name "AB20A-EST-001_REV02.dwg"`.
+- Durante a varredura Python, sugestões são persistidas na tabela `filename_suggestions`, separadas dos vínculos de projeto e dos metadados confirmados.
+- Sugestões ficam pendentes de revisão (`pending`); os estados previstos são `accepted` e `rejected`.
+- Uma nova varredura com o mesmo resultado não desfaz uma decisão humana já registrada. Se os metadados extraídos mudarem, a sugestão volta para revisão.
 - Nenhum arquivo é aberto, renomeado, movido ou alterado por essa análise.
 - A confirmação humana e a comparação com dados do carimbo continuam obrigatórias.
+- A listagem e a revisão dessas sugestões na interface desktop ainda são etapas futuras; o motor Python e seus testes cobrem a persistência.
 
 ## Fase 2 — Engenharia e divergências
 
