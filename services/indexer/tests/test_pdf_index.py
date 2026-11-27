@@ -1,3 +1,4 @@
+from ged_indexer.cli import build_content_fts_query
 from ged_indexer.database import connect
 
 
@@ -29,3 +30,7 @@ def test_extracted_pdf_text_is_searchable_and_updates_fts(tmp_path):
         assert connection.execute(
             "SELECT rowid FROM document_text_fts WHERE document_text_fts MATCH ?", ("rodovia",)
         ).fetchone() is not None
+
+
+def test_content_search_query_handles_hyphenated_drawing_numbers():
+    assert build_content_fts_query("EST-001 REV02") == '"EST"* AND "001"* AND "REV02"*'
