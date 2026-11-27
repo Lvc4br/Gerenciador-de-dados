@@ -143,10 +143,26 @@ export async function previewInvoke<T>(command: string, args: Record<string, unk
       const extension = String(args.extension ?? "").toLowerCase().replace(/^\./, "");
       const sortBy = String(args.sortBy ?? "path");
       const ascending = args.ascending !== false;
-      const filtered = sampleFiles.filter(file =>
-        (!search || file.filename.toLocaleLowerCase("pt-BR").includes(search) || file.relative_path.toLocaleLowerCase("pt-BR").includes(search)) &&
-        (!extension || file.extension === extension)
-      );
+      const projectId = args.projectId == null || args.projectId === "" ? null : Number(args.projectId);
+      const disciplineId = args.disciplineId == null || args.disciplineId === "" ? null : Number(args.disciplineId);
+      const client = String(args.client ?? "").toLocaleLowerCase("pt-BR");
+      const filtered = sampleFiles.filter(file => {
+        const linkedProjectIds = sampleProjects.filter(project => {
+          const rootLinked = (sampleProjectRootLinks[project.id] ?? []).includes(1);
+          const fileLinked = Object.prototype.hasOwnProperty.call(sampleProjectFileLinks, project.id + ":" + file.id);
+          return rootLinked || fileLinked;
+        });
+        const project = projectId === null ? null : sampleProjects.find(item => item.id === projectId);
+        const linkedToProject = projectId === null || (
+          ((sampleProjectRootLinks[projectId] ?? []).includes(1) || Object.prototype.hasOwnProperty.call(sampleProjectFileLinks, projectId + ":" + file.id))
+        );
+        const fileDiscipline = projectId === null ? null : sampleProjectFileLinks[projectId + ":" + file.id];
+        const matchesClient = !client || linkedProjectIds.some(item => item.client.toLocaleLowerCase("pt-BR").includes(client));
+        return linkedToProject && matchesClient &&
+          (disciplineId === null || fileDiscipline === disciplineId) &&
+          (!search || file.filename.toLocaleLowerCase("pt-BR").includes(search) || file.relative_path.toLocaleLowerCase("pt-BR").includes(search)) &&
+          (!extension || file.extension === extension);
+      });
       filtered.sort((a, b) => String(a[sortBy as keyof typeof a] ?? a.relative_path).localeCompare(String(b[sortBy as keyof typeof b] ?? b.relative_path), "pt-BR") * (ascending ? 1 : -1));
       const offset = Number(args.offset ?? 0);
       const limit = Number(args.limit ?? 100);
