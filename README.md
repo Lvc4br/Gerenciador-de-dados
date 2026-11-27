@@ -93,7 +93,9 @@ A branch `feature/mvp-core-indexer` contém:
 - extração textual de PDF individual ou em lote no desktop, com verificação SHA-256, limites de tamanho/páginas/caracteres, status de extração, trechos de contexto e armazenamento FTS5 no mesmo SQLite;
 - indicação de PDFs sem camada de texto, que exigirão OCR;
 - sugestões preliminares de número de desenho, revisão e título extraídas do PDF, exibidas na tela Revisão junto às evidências do nome e do carimbo;
-- migrações 6 e 7 para texto extraído, índice de conteúdo e contagem de páginas;
+- catálogo de projetos, vínculos de pastas/documentos e disciplinas configuráveis;
+- sugestões de metadados pelo nome do arquivo, revisão humana e aplicação auditada dos valores aceitos;
+- migrações 6, 7 e 8 para texto extraído, índice de conteúdo, contagem de páginas e candidatos de metadados PDF;
 - importação dos dois esquemas CSV reconhecidos da amostra;
 - tela de consulta de divergências importadas, com origem e linha do CSV;
 - reimportação CSV transacional com savepoint, limpeza de linhas excedentes e reconciliação quando o esquema da fonte muda;
@@ -103,9 +105,8 @@ A branch `feature/mvp-core-indexer` contém:
 
 ## Próximas entregas
 
-1. Estabilizar varredura, erros, reconciliação e build Windows.
-2. Implementar migrações SQLite versionadas e validar backup/restauração em bases reais; armazenamento binário de versões continua pendente.
-3. Consolidar catálogo de projetos e busca FTS5.
-4. Implementar OCR opcional para PDFs digitalizados, leitura de Office e visualização segura.
-5. Fazer prova de conceito DWG/DXF/IFC com validação de licença e compatibilidade.
-6. Implementar comparação, recomendações explicáveis e exportação com evidências.
+1. Confirmar CI completo, validar instalador e executar smoke test em Windows 10/11 limpo; implementar cancelamento de varredura.
+2. Validar backup/restauração e migrações com bancos reais; decidir política para armazenamento binário de versões antigas.
+3. Implementar OCR opcional para PDFs digitalizados e extração de Office, com proveniência e revisão humana.
+4. Fazer prova de conceito DWG/DXF/IFC com validação de licença e compatibilidade.
+5. Implementar comparação de revisões/carimbos, regras explicáveis e exportação com evidências.
