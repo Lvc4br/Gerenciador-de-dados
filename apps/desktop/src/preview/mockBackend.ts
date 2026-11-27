@@ -15,7 +15,13 @@ let sampleProjects = [
 ];
 let nextProjectId = 2;
 const sampleRoots = [{ id: 1, path: 'C:\\\\Projetos\\\\AB20A', added_at: '2026-10-01' }];
-let sampleProjectRootLinks: Record<number, number[]> = { 1: [1] };\nlet sampleDisciplines: Array<{id:number;project_id:number;code:string;name:string;sort_order:number}> = [\n  { id: 1, project_id: 1, code: 'EST', name: 'Estruturas', sort_order: 0 },\n  { id: 2, project_id: 1, code: 'DRE', name: 'Drenagem', sort_order: 1 }\n];\nlet nextDisciplineId = 3;\nlet sampleProjectFileLinks: Record<string, number | null> = { '1:1': 1, '1:5': 2 };
+let sampleProjectRootLinks: Record<number, number[]> = { 1: [1] };
+let sampleDisciplines: Array<{id:number;project_id:number;code:string;name:string;sort_order:number}> = [
+  { id: 1, project_id: 1, code: 'EST', name: 'Estruturas', sort_order: 0 },
+  { id: 2, project_id: 1, code: 'DRE', name: 'Drenagem', sort_order: 1 }
+];
+let nextDisciplineId = 3;
+let sampleProjectFileLinks: Record<string, number | null> = { '1:1': 1, '1:5': 2 };
 
 const sampleDiscrepancies = [
   { id: 1, filename: "AB20A-EST-001.dwg", branch: "Estruturas", number_in_filename: "EST-001", number_in_titleblock: "EST-010", revision: "02", extracted_title: "Planta de formas - tabuleiro", title_for_titleblock_number: "Detalhe de encontro", diagnosis: "Número divergente", artesp_number: "ART-001", internal_number: "EST-001", source_row: 2, source_csv: "divergencias_numero_carimbo.csv" },
