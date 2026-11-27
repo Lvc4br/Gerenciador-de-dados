@@ -181,7 +181,7 @@ fn build_fts_query(search: &str) -> Option<String> {
     let terms: Vec<String> = search.split_whitespace()
         .map(|term| term.chars().filter(|character| character.is_alphanumeric()).collect::<String>())
         .filter(|term| term.chars().count() >= 2)
-        .map(|term| format!("\\"{term}\\"*"))
+        .map(|term| format!("\"{term}\"*"))
         .collect();
     if terms.is_empty() { None } else { Some(terms.join(" AND ")) }
 }
