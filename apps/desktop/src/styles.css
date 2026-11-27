@@ -78,3 +78,16 @@
 .preview-banner{display:flex;align-items:center;gap:12px;margin:0 0 18px;padding:11px 14px;border:1px solid #e7d7a8;border-radius:10px;background:#fff9e9;color:#755b20;font-size:12px}
 .preview-banner b{flex:none;font-size:10px;letter-spacing:.09em}
 .preview-banner span{color:#75694c}
+
+
+/* Project catalog */
+.project-form { margin-bottom: 18px; }
+.project-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 16px 0; }
+.project-form-grid label { display: flex; flex-direction: column; gap: 6px; color: var(--text-secondary, #64748b); font-size: 12px; font-weight: 600; }
+.project-form-grid input { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--border, #dce2e9); border-radius: 8px; background: var(--surface, #fff); color: var(--text, #172033); font: inherit; font-size: 13px; }
+.project-layout { align-items: start; }
+.project-root-option { display: flex; align-items: flex-start; gap: 9px; padding: 10px 0; border-bottom: 1px solid var(--border, #e5e9ef); color: var(--text, #273449); font-size: 12px; overflow-wrap: anywhere; cursor: pointer; }
+.project-root-option input { margin-top: 2px; accent-color: #2563eb; }
+@media (max-width: 900px) {
+  .project-form-grid { grid-template-columns: 1fr; }
+}
