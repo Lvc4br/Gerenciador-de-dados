@@ -10,7 +10,7 @@ import {
 
 type Section = "Visão geral" | "Projetos" | "Explorador" | "Divergências" | "Exportações";
 type DashboardStats = { root_count: number; file_count: number; duplicate_hash_groups: number; drawing_metadata_count: number; discrepancy_count: number };
-type ScanSummary = { root: string; indexed: number; skipped: number; errors: number; duplicate_hash_groups: number };
+type ScanSummary = { root: string; indexed: number; skipped: number; errors: number; missing: number; reconciliation_complete: boolean; duplicate_hash_groups: number };
 
 const navigation: { label: Section; icon: typeof LayoutDashboard }[] = [
   { label: "Visão geral", icon: LayoutDashboard },
@@ -224,7 +224,7 @@ function App() {
     try {
       const result = await invoke<ScanSummary>("scan_folder", { folder: selected });
       await refreshStats();
-      setMessage(`Indexação concluída: ${result.indexed} arquivo(s), ${result.skipped} ignorado(s), ${result.errors} erro(s). ${result.duplicate_hash_groups} grupo(s) de hashes duplicados na biblioteca.`);
+      setMessage(`Indexação concluída: ${result.indexed} arquivo(s) indexado(s), ${result.skipped} ignorado(s), ${result.errors} erro(s), ${result.missing} ausente(s). ${result.duplicate_hash_groups} grupo(s) de hashes duplicados. ${result.reconciliation_complete ? "Reconciliação concluída." : "Reconciliação parcial: houve erros ao percorrer a pasta; arquivos não foram marcados como ausentes."}`);
     } catch (reason) {
       setError(String(reason));
       setMessage("");
@@ -245,7 +245,7 @@ function App() {
           {navigation.map(({ label, icon: Icon }) => (
             <button key={label} className={section === label ? "nav-item active" : "nav-item"} onClick={() => setSection(label)}>
               <Icon size={18} strokeWidth={1.8} /><span>{label}</span>
-              {label === "Divergências" && stats.duplicate_hash_groups > 0 && <i className="nav-dot" />}
+              {label === "Divergências" && stats.discrepancy_count > 0 && <i className="nav-dot" />}
             </button>
           ))}
         </nav>
