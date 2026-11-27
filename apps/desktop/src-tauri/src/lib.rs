@@ -726,7 +726,7 @@ fn extract_pdf_metadata_candidates(text: &str) -> Result<(Option<String>, Option
 
     let drawing_number = drawing_pattern.captures(text).and_then(|captures| {
         let prefix = captures.get(1)?.as_str().to_ascii_uppercase();
-        if ["REV", "ISO", "ABNT", "NBR"].contains(&prefix.as_str()) { return None; }
+        if ["REV", "ISO", "ABNT", "NBR", "BR"].contains(&prefix.as_str()) { return None; }
         let number = captures.get(2)?.as_str();
         Some(format!("{prefix}-{number}"))
     });
