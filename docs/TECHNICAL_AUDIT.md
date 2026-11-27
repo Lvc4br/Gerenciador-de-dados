@@ -51,6 +51,7 @@ O principal ajuste arquitetural recomendado é separar claramente as responsabil
 
 Na continuação da Fase 0, foram adicionadas à branch:
 - Registro de execuções de varredura em `scan_runs`.
+- Histórico de versões por SHA-256, com tamanho e datas, exibido nas propriedades do arquivo. O histórico registra fingerprints e metadados, não cópias físicas do conteúdo; backup de binários permanece como etapa separada.
 - Migração compatível para adicionar `last_seen_scan_id` em bancos já existentes.
 - Reconciliação de arquivos não encontrados: quando a travessia da pasta termina sem erro, os registros não vistos são marcados como `missing`, sem apagar seus dados.
 - Erros de travessia impedem a marcação global de ausentes, evitando falsos positivos em varreduras parciais.
@@ -59,7 +60,7 @@ Na continuação da Fase 0, foram adicionadas à branch:
 - Contadores do dashboard e grupos de duplicidade consideram somente arquivos atualmente indexados.
 - Reimportação CSV remove linhas antigas excedentes, limpa os dados do tipo anterior quando o esquema da fonte muda e usa savepoint para rollback integral em falhas.
 
-**Limitações ainda abertas:** ainda não há cancelamento da varredura; histórico imutável de conteúdo ainda não foi criado. Essas correções também aguardam confirmação do CI Windows.
+**Limitações ainda abertas:** ainda não há cancelamento da varredura; o histórico atual não armazena cópias binárias, então não permite restaurar conteúdo antigo; backup e restauração do banco ainda precisam ser implementados. Essas correções também aguardam confirmação do CI Windows.
 
 ## 4. Achados da auditoria — prioridade
 
