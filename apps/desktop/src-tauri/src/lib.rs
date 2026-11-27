@@ -2,7 +2,7 @@ use rusqlite::{params, Connection};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{fs::File, io::Read, path::{Path, PathBuf}};
-use tauri::{Manager, State};
+use tauri::Manager;
 use walkdir::WalkDir;
 
 const MAX_FILE_SIZE: u64 = 2 * 1024 * 1024 * 1024;
