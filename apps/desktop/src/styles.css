@@ -133,3 +133,22 @@
   border-color: var(--accent, #527a68);
   background: var(--surface-raised, #edf4ef);
 }
+
+
+.metadata-warning,
+.metadata-hint {
+  grid-column: 1 / -1;
+  padding: 9px 11px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.metadata-warning {
+  color: #8a4b13;
+  background: #fff4df;
+  border: 1px solid #f0d7a7;
+}
+.metadata-hint {
+  color: var(--muted, #64748b);
+  background: var(--surface-subtle, #f4f6f8);
+}
