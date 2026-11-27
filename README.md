@@ -77,10 +77,22 @@ A amostra demonstra um caso de uso concreto: conferir se o identificador do arqu
 11. Operações essenciais devem funcionar offline.
 12. Não enviar documentos para serviços externos/IA em nuvem sem consentimento explícito.
 
-## Estado
+## Estado atual da implementação
 
-Este repositório contém a especificação inicial. O aplicativo executável ainda precisa ser implementado, empacotado e validado em máquinas Windows e com arquivos reais.
+A branch `feature/mvp-core-indexer` contém o primeiro esqueleto de implementação:
+- shell desktop Tauri 2 com interface React/TypeScript;
+- painel inicial e navegação visual do GED;
+- seletor nativo de pasta;
+- indexador nativo inicial que percorre diretórios sem seguir links simbólicos, calcula SHA-256 e registra os arquivos em SQLite local;
+- indicadores locais de pastas, arquivos e grupos com hashes duplicados;
+- núcleo Python inicial e testes automatizados para evolução dos parsers.
 
-## Próximo passo
+**Ainda não é uma versão pronta para uso ou distribuição.** A compilação e os testes precisam ser executados em ambiente Windows; os módulos de visualização, leitura avançada, divergências de metadados, busca e exportação ainda serão implementados.
 
-Implementar o MVP vertical desktop: shell Tauri, interface Explorer, sidecar Python, banco SQLite, indexação de pastas, leitura CSV/PDF e relatório de divergências usando a amostra AB20A.
+## Próximas entregas
+
+1. Validar compilação Tauri e indexação em Windows 10/11.
+2. Criar explorador de arquivos conectado ao SQLite, com pesquisa, filtros e ordenação.
+3. Implementar leitura de CSV/TXT/JSON e PDF, incluindo metadados com proveniência.
+4. Implementar regras de divergência e relatórios com evidências.
+5. Integrar visualizadores e adaptadores CAD/BIM após testes de compatibilidade/licença.
