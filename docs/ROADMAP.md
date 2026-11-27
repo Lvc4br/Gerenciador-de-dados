@@ -18,7 +18,7 @@
 - Cadastro de projetos e raízes de biblioteca.
 - Varredura recursiva, importação e indexação de pastas.
 - Hash SHA-256, deduplicação e preservação dos originais.
-- SQLite + FTS5 e migrações.
+- SQLite + FTS5 e migrações versionadas (baseline e índices de catálogo já registrados; FTS5 ainda pendente).
 - Leitura de CSV, TXT e PDF textual.
 - Explorer com árvore, lista/grade, breadcrumbs, ordenação, filtros e preview.
 - Busca e exportação CSV/XLSX.
