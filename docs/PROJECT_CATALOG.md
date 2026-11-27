@@ -110,3 +110,16 @@ A primeira entrega foi implementada na branch `feature/mvp-core-indexer`:
 - A prévia visual não persiste dados após atualizar a página; a persistência real ocorre no aplicativo Tauri.
 
 A geração do instalador Windows e os testes completos de CI precisam terminar antes de considerar esta versão validada para distribuição.
+
+
+## Evolução — relações entre documentos e disciplinas (27/11/2026)
+
+Foi adicionada a migração SQLite versão 5, sem alterar arquivos originais:
+
+- `project_file_links`: vínculo lógico de um documento indexado a um projeto, com disciplina opcional, origem manual/regra e confiança.
+- Um mesmo arquivo pode ser relacionado a mais de um projeto.
+- A exclusão de uma disciplina mantém o vínculo do documento e define sua disciplina como nula (`ON DELETE SET NULL`).
+- Comandos Rust adicionados: `list_project_disciplines`, `save_project_discipline`, `delete_project_discipline`, `list_project_files` e `set_project_file_link`.
+- A listagem de documentos do projeto reúne arquivos das raízes vinculadas e documentos associados individualmente, com pesquisa e filtro de disciplina.
+
+Esta entrega amplia o backend, mas ainda não significa que os novos recursos estejam expostos na interface. A tela de projetos precisa receber a próxima integração visual; a prévia de navegador também precisa de mocks correspondentes. Testes automatizados e CI devem validar a migração em bancos novos e existentes antes de uso com dados importantes.
