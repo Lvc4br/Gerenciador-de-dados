@@ -10,7 +10,7 @@ import {
   FileText, RefreshCw, ChevronLeft, ArrowUpDown
 } from "lucide-react";
 
-type Section = "Visão geral" | "Projetos" | "Explorador" | "Divergências" | "Exportações";
+type Section = "Visão geral" | "Projetos" | "Explorador" | "Revisão" | "Divergências" | "Exportações";
 type DashboardStats = { root_count: number; file_count: number; duplicate_hash_groups: number; drawing_metadata_count: number; discrepancy_count: number };
 type ScanSummary = { root: string; indexed: number; skipped: number; errors: number; missing: number; reconciliation_complete: boolean; duplicate_hash_groups: number };
 type ScanProgress = { root: string; visited: number; indexed: number; skipped: number; errors: number };
@@ -19,6 +19,7 @@ const navigation: { label: Section; icon: typeof LayoutDashboard }[] = [
   { label: "Visão geral", icon: LayoutDashboard },
   { label: "Projetos", icon: Folder },
   { label: "Explorador", icon: Files },
+  { label: "Revisão", icon: FileCheck2 },
   { label: "Divergências", icon: CircleAlert },
   { label: "Exportações", icon: ArrowDownToLine }
 ];
@@ -476,6 +477,85 @@ function ProjectsPanel() {
   );
 }
 
+
+type FilenameSuggestion = {
+  id: number; file_id: number; filename: string; relative_path: string;
+  project_prefix: string | null; discipline_code: string | null;
+  drawing_number: string | null; revision: string | null;
+  confidence: number; status: "pending" | "accepted" | "rejected"; created_at: string;
+};
+type SuggestionPage = { items: FilenameSuggestion[]; total: number };
+
+function ReviewPanel() {
+  const [status, setStatus] = useState("pending");
+  const [search, setSearch] = useState("");
+  const [data, setData] = useState<SuggestionPage>({ items: [], total: 0 });
+  const [loading, setLoading] = useState(false);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  async function loadSuggestions() {
+    setLoading(true); setError("");
+    try {
+      const result = await invoke<SuggestionPage>("list_filename_suggestions", {
+        status, search, limit: 100, offset: 0
+      });
+      setData(result);
+    } catch (reason) { setError(String(reason)); }
+    finally { setLoading(false); }
+  }
+
+  useEffect(() => { void loadSuggestions(); }, [status, search]);
+
+  async function review(item: FilenameSuggestion, decision: "accepted" | "rejected") {
+    setBusyId(item.id); setError(""); setNotice("");
+    try {
+      await invoke<void>("review_filename_suggestion", { id: item.id, decision });
+      setNotice(decision === "accepted"
+        ? "Sugestão aceita e decisão registrada. Nenhum arquivo original foi alterado."
+        : "Sugestão rejeitada e decisão registrada.");
+      await loadSuggestions();
+    } catch (reason) { setError(String(reason)); }
+    finally { setBusyId(null); }
+  }
+
+  return (
+    <section className="explorer">
+      <div className="page-heading explorer-heading">
+        <div><div className="eyebrow">IDENTIFICAÇÃO ASSISTIDA</div><h1>Revisão de documentos</h1><p>Confira as informações sugeridas pelo nome do arquivo antes de utilizá-las no cadastro do projeto.</p></div>
+        <button className="secondary-button" onClick={() => void loadSuggestions()} disabled={loading}><RefreshCw size={15} /> Atualizar</button>
+      </div>
+      <div className="explorer-toolbar">
+        <label className="explorer-search"><Search size={16} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar arquivo ou número do desenho..." /></label>
+        <label className="filter-control"><span>Situação</span><select value={status} onChange={e => setStatus(e.target.value)}><option value="pending">Aguardando revisão</option><option value="accepted">Aceitas</option><option value="rejected">Rejeitadas</option><option value="all">Todas</option></select></label>
+      </div>
+      <div className="explorer-summary"><span>{loading ? "Consultando sugestões..." : data.total.toLocaleString("pt-BR") + " sugestão(ões)"}</span><span>Confiança é indicativa, não uma validação técnica</span></div>
+      {(error || notice) && <div className={error ? "notice error" : "notice"} role="status">{error || notice}</div>}
+      <div className="surface-card">
+        {data.items.map(item => (
+          <article className="review-item" key={item.id}>
+            <div className="review-item-heading"><div><b>{item.filename}</b><small>{item.relative_path}</small></div><span className={"file-status " + (item.status === "pending" ? "skipped" : item.status === "accepted" ? "indexed" : "missing")}>{item.status === "pending" ? "Pendente" : item.status === "accepted" ? "Aceita" : "Rejeitada"}</span></div>
+            <div className="review-metadata">
+              <div><small>Projeto provável</small><b>{item.project_prefix || "—"}</b></div>
+              <div><small>Disciplina</small><b>{item.discipline_code || "—"}</b></div>
+              <div><small>Número do desenho</small><b>{item.drawing_number || "—"}</b></div>
+              <div><small>Revisão</small><b>{item.revision || "—"}</b></div>
+              <div><small>Confiança</small><b>{Math.round(item.confidence * 100)}%</b></div>
+            </div>
+            {item.status === "pending" && <div className="dashboard-actions review-actions">
+              <button className="secondary-button" disabled={busyId === item.id} onClick={() => void review(item, "rejected")}>Rejeitar</button>
+              <button className="primary-button" disabled={busyId === item.id} onClick={() => void review(item, "accepted")}>{busyId === item.id ? "Salvando..." : "Aceitar sugestão"}</button>
+            </div>}
+          </article>
+        ))}
+        {!loading && data.items.length === 0 && <div className="table-empty">Nenhuma sugestão encontrada nesta situação. Execute uma indexação de pasta para analisar os nomes dos arquivos.</div>}
+      </div>
+      <p className="detail-note">A aceitação registra somente a decisão sobre a sugestão. O vínculo do documento a um projeto e os metadados oficiais continuam sendo ações separadas.</p>
+    </section>
+  );
+}
+
 function App() {
   const [section, setSection] = useState<Section>("Visão geral");
   const [query, setQuery] = useState("");
@@ -599,7 +679,7 @@ function App() {
 
         <div className="page-content">
           {isPreviewMode && <div className="preview-banner"><b>PRÉVIA VISUAL</b><span>Dados demonstrativos. Indexação, backup e restauração reais exigem o aplicativo desktop.</span></div>}
-          {section === "Projetos" ? (<ProjectsPanel />) : section === "Explorador" ? (<ExplorerPanel />) : section === "Divergências" ? (<DiscrepanciesPanel />) : section === "Visão geral" ? (
+          {section === "Projetos" ? (<ProjectsPanel />) : section === "Explorador" ? (<ExplorerPanel />) : section === "Revisão" ? (<ReviewPanel />) : section === "Divergências" ? (<DiscrepanciesPanel />) : section === "Visão geral" ? (
             <>
               <div className="page-heading">
                 <div><div className="eyebrow">CENTRAL DE CONTROLE</div><h1>Visão geral</h1><p>Encontre, organize e analise o conhecimento dos projetos da sua engenharia.</p></div>
