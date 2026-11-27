@@ -178,8 +178,8 @@ fn apply_fts_migration(connection: &Connection) -> Result<(), String> {
 }
 
 fn build_fts_query(search: &str) -> Option<String> {
-    let terms: Vec<String> = search.split_whitespace()
-        .map(|term| term.chars().filter(|character| character.is_alphanumeric()).collect::<String>())
+    let terms: Vec<String> = search
+        .split(|character: char| !character.is_alphanumeric())
         .filter(|term| term.chars().count() >= 2)
         .map(|term| format!("\"{term}\"*"))
         .collect();
