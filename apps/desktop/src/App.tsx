@@ -95,7 +95,7 @@ function ExplorerPanel() {
                 <td><span className="file-ext">{file.extension ? file.extension.toUpperCase() : 'SEM TIPO'}</span></td>
                 <td>{formatBytes(file.byte_size)}</td>
                 <td>{formatDate(file.modified_at)}</td>
-                <td><span className={`file-status ${file.status}`}>{file.status === 'missing' ? 'Ausente' : file.status === 'skipped' ? 'Ignorado' : 'Indexado'}</span></td>
+                <td><span className={`file-status ${file.status}`}>{file.status === 'missing' ? 'Ausente' : file.status === 'skipped' ? 'Ignorado' : file.status === 'error' ? 'Erro' : 'Indexado'}</span></td>
               </tr>)}
               {!loading && data.items.length === 0 && <tr><td colSpan={5} className="table-empty">Nenhum arquivo encontrado. Importe uma pasta na Visão geral para começar.</td></tr>}
             </tbody>
