@@ -53,7 +53,8 @@ Na continuação da Fase 0, foram adicionadas à branch:
 - Registro de execuções de varredura em `scan_runs`.
 - Histórico de versões por SHA-256, com tamanho e datas, exibido nas propriedades do arquivo. O histórico registra fingerprints e metadados, não cópias físicas do conteúdo.
 - Backup consistente do SQLite pela API online backup do SQLite, com verificação `integrity_check`.
-- Restauração de backup GED validado, precedida por cópia automática do banco atual.
+- Restauração de backup GED validado, precedida por cópia automática do banco atual; falha na validação tenta recuperar o banco anterior.
+- Teste unitário Rust para confirmar cópia do schema e dos registros por SQLite online backup.
 - Migração compatível para adicionar `last_seen_scan_id` em bancos já existentes.
 - Reconciliação de arquivos não encontrados: quando a travessia da pasta termina sem erro, os registros não vistos são marcados como `missing`, sem apagar seus dados.
 - Erros de travessia impedem a marcação global de ausentes, evitando falsos positivos em varreduras parciais.
@@ -62,7 +63,7 @@ Na continuação da Fase 0, foram adicionadas à branch:
 - Contadores do dashboard e grupos de duplicidade consideram somente arquivos atualmente indexados.
 - Reimportação CSV remove linhas antigas excedentes, limpa os dados do tipo anterior quando o esquema da fonte muda e usa savepoint para rollback integral em falhas.
 
-**Limitações ainda abertas:** ainda não há cancelamento da varredura; o histórico atual não armazena cópias binárias, então não permite restaurar versões individuais de documentos. Backup e restauração do banco foram implementados, mas ainda precisam de teste funcional em Windows e de teste com bancos maiores. As alterações aguardam confirmação do CI Windows.
+**Limitações ainda abertas:** ainda não há cancelamento da varredura; o histórico atual não armazena cópias binárias, então não permite restaurar versões individuais de documentos. Backup e restauração do banco foram implementados; há teste unitário do mecanismo de cópia, mas ainda faltam teste funcional de ponta a ponta em Windows e teste com bancos maiores. As alterações aguardam confirmação do CI Windows.
 
 ## 4. Achados da auditoria — prioridade
 
