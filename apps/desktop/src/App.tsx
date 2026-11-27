@@ -29,7 +29,14 @@ type FileRecord = {
 };
 type FilePage = { items: FileRecord[]; total: number };
 
-function formatDate(value: string, includeTime = false) {\n  if (!value) return '—';\n  const numeric = Number(value);\n  const date = new Date(Number.isFinite(numeric) ? numeric * 1000 : value);\n  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('pt-BR', includeTime ? { dateStyle: 'short', timeStyle: 'short' } : { dateStyle: 'short' });\n}\n\nfunction formatBytes(bytes: number) {
+function formatDate(value: string, includeTime = false) {
+  if (!value) return '—';
+  const numeric = Number(value);
+  const date = new Date(Number.isFinite(numeric) ? numeric * 1000 : value);
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('pt-BR', includeTime ? { dateStyle: 'short', timeStyle: 'short' } : { dateStyle: 'short' });
+}
+
+function formatBytes(bytes: number) {
   if (bytes < 1024) return String(bytes) + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
   if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
