@@ -139,6 +139,7 @@ fn open_database(app: &tauri::AppHandle) -> Result<Connection, String> {
     }
 
     apply_fts_migration(&connection)?;
+    apply_document_text_migration(&connection)?;
     csv_metadata::ensure_schema(&connection)?;
     projects::ensure_schema(&connection)?;
     projects::ensure_relations_schema(&connection)?;
@@ -177,6 +178,48 @@ fn apply_fts_migration(connection: &Connection) -> Result<(), String> {
     ).map_err(|e| format!("Não foi possível preparar a busca textual FTS5: {e}"))?;
     transaction.execute(
         "INSERT INTO schema_migrations(version, name) VALUES (3, 'files_full_text_search')",
+        []
+    ).map_err(|e| e.to_string())?;
+    transaction.commit().map_err(|e| e.to_string())
+}
+
+fn apply_document_text_migration(connection: &Connection) -> Result<(), String> {
+    let already_applied: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM schema_migrations WHERE version=6",
+        [], |row| row.get(0)
+    ).map_err(|e| e.to_string())?;
+    if already_applied > 0 { return Ok(()); }
+
+    let transaction = connection.unchecked_transaction().map_err(|e| e.to_string())?;
+    transaction.execute_batch(
+        "CREATE TABLE IF NOT EXISTS extracted_document_text (
+           file_id INTEGER PRIMARY KEY REFERENCES files(id) ON DELETE CASCADE,
+           sha256 TEXT NOT NULL,
+           content TEXT NOT NULL,
+           character_count INTEGER NOT NULL,
+           parser_version TEXT NOT NULL,
+           extracted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+         );
+         CREATE VIRTUAL TABLE IF NOT EXISTS document_text_fts USING fts5(
+           content, content='extracted_document_text', content_rowid='file_id',
+           tokenize='unicode61 remove_diacritics 2'
+         );
+         CREATE TRIGGER IF NOT EXISTS document_text_ai AFTER INSERT ON extracted_document_text BEGIN
+           INSERT INTO document_text_fts(rowid, content) VALUES (new.file_id, new.content);
+         END;
+         CREATE TRIGGER IF NOT EXISTS document_text_ad AFTER DELETE ON extracted_document_text BEGIN
+           INSERT INTO document_text_fts(document_text_fts, rowid, content)
+           VALUES ('delete', old.file_id, old.content);
+         END;
+         CREATE TRIGGER IF NOT EXISTS document_text_au AFTER UPDATE ON extracted_document_text BEGIN
+           INSERT INTO document_text_fts(document_text_fts, rowid, content)
+           VALUES ('delete', old.file_id, old.content);
+           INSERT INTO document_text_fts(rowid, content) VALUES (new.file_id, new.content);
+         END;
+         INSERT INTO document_text_fts(document_text_fts) VALUES ('rebuild');"
+    ).map_err(|e| format!("Não foi possível preparar o índice de conteúdo PDF: {e}"))?;
+    transaction.execute(
+        "INSERT INTO schema_migrations(version, name) VALUES (6, 'pdf_document_text_search')",
         []
     ).map_err(|e| e.to_string())?;
     transaction.commit().map_err(|e| e.to_string())
