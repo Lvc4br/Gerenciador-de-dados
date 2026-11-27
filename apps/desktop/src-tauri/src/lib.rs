@@ -980,6 +980,42 @@ mod backup_tests {
     }
 
     #[test]
+    fn document_text_migration_indexes_and_updates_pdf_content() {
+        let connection = Connection::open_in_memory().expect("open database");
+        connection.execute_batch(
+            "CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY, name TEXT NOT NULL);
+             CREATE TABLE files(id INTEGER PRIMARY KEY, filename TEXT NOT NULL, relative_path TEXT NOT NULL);"
+        ).expect("create legacy schema");
+        apply_document_text_migration(&connection).expect("apply document text migration");
+        connection.execute(
+            "INSERT INTO files(id,filename,relative_path) VALUES (1,'memorial.pdf','memorial.pdf')", []
+        ).expect("insert file");
+        connection.execute(
+            "INSERT INTO extracted_document_text(file_id,sha256,content,character_count,parser_version)
+             VALUES (1,'abc','Estrutura de concreto EST-001',30,'test')", []
+        ).expect("insert extracted text");
+        let found: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM document_text_fts WHERE document_text_fts MATCH 'EST-001'",
+            [], |row| row.get(0)
+        ).expect("search extracted text");
+        assert_eq!(found, 1);
+
+        connection.execute(
+            "UPDATE extracted_document_text SET content='Memorial de drenagem DRE-014' WHERE file_id=1", []
+        ).expect("update extracted text");
+        let stale: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM document_text_fts WHERE document_text_fts MATCH 'EST-001'",
+            [], |row| row.get(0)
+        ).expect("search stale content");
+        let current: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM document_text_fts WHERE document_text_fts MATCH 'DRE-014'",
+            [], |row| row.get(0)
+        ).expect("search current content");
+        assert_eq!(stale, 0);
+        assert_eq!(current, 1);
+    }
+
+    #[test]
     fn sqlite_online_backup_preserves_schema_and_rows() {
         let source = Connection::open_in_memory().expect("open source");
         source.execute_batch(
