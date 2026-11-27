@@ -33,6 +33,8 @@ O SQL abaixo é uma base inicial. Deve ser aplicado por migrações versionadas 
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS citext;
+-- Habilitar pgvector apenas nos ambientes que utilizarem embeddings.
 CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TABLE workspaces (
