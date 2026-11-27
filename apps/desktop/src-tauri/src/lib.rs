@@ -1123,7 +1123,7 @@ mod backup_tests {
              VALUES (1,'abc','Estrutura de concreto EST-001',30,'test',2,2)", []
         ).expect("insert extracted text");
         let found: i64 = connection.query_row(
-            "SELECT COUNT(*) FROM document_text_fts WHERE document_text_fts MATCH 'EST-001'",
+            "SELECT COUNT(*) FROM document_text_fts WHERE document_text_fts MATCH '"EST-001"'",
             [], |row| row.get(0)
         ).expect("search extracted text");
         assert_eq!(found, 1);
