@@ -69,3 +69,31 @@ def test_rejects_password_protected_pdf(tmp_path, monkeypatch):
     monkeypatch.setitem(sys.modules, "pypdf", SimpleNamespace(PdfReader=EncryptedReader))
     with pytest.raises(PdfExtractionError, match="protegido por senha"):
         extract_pdf_text(file)
+
+
+def test_extracts_real_pdf_text_with_pypdf(tmp_path):
+    from pypdf import PdfWriter
+    from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+
+    pdf = tmp_path / "real.pdf"
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=300, height=300)
+    font = DictionaryObject({
+        NameObject("/Type"): NameObject("/Font"),
+        NameObject("/Subtype"): NameObject("/Type1"),
+        NameObject("/BaseFont"): NameObject("/Helvetica"),
+    })
+    page[NameObject("/Resources")] = DictionaryObject({
+        NameObject("/Font"): DictionaryObject({NameObject("/F1"): font})
+    })
+    stream = DecodedStreamObject()
+    stream.set_data(b"BT /F1 12 Tf 20 200 Td (EST-001 REV02) Tj ET")
+    page[NameObject("/Contents")] = stream
+    with pdf.open("wb") as output:
+        writer.write(output)
+
+    result = extract_pdf_text(pdf)
+
+    assert result["page_count"] == 1
+    assert result["pages_with_text"] == 1
+    assert "EST-001 REV02" in result["text"]
