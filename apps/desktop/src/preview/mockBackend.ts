@@ -10,6 +10,11 @@ const sampleFiles = [
   { id: 6, filename: "Planilha_Custos.xlsx", relative_path: "Orcamento/Planilha_Custos.xlsx", extension: "xlsx", byte_size: 216880, modified_at: "2026-07-22T11:42:00Z", sha256: "f36f8f6d1a7b9d3e4c5f6a7b8c9d00112233445566778899aabbccddeeff0066", root_path: "C:\\Projetos\\AB20A", status: "indexed" }
 ];
 
+let sampleFilenameSuggestions = [
+  { id: 1, file_id: 1, filename: "AB20A-EST-001.dwg", relative_path: "Estruturas/AB20A-EST-001.dwg", project_prefix: "AB20A", discipline_code: "EST", drawing_number: "EST-001", revision: "02", confidence: 0.92, status: "pending" as const, created_at: "2026-11-27" },
+  { id: 2, file_id: 2, filename: "AB20A-EST-001.pdf", relative_path: "Estruturas/AB20A-EST-001.pdf", project_prefix: "AB20A", discipline_code: "EST", drawing_number: "EST-001", revision: null, confidence: 0.78, status: "pending" as const, created_at: "2026-11-27" },
+  { id: 3, file_id: 5, filename: "AB20A-DRE-014.dwg", relative_path: "Drenagem/AB20A-DRE-014.dwg", project_prefix: "AB20A", discipline_code: "DRE", drawing_number: "DRE-014", revision: null, confidence: 0.78, status: "accepted" as const, created_at: "2026-11-27" }
+];
 let sampleProjects = [
   { id: 1, code: 'AB20A', name: 'Adequação da Ponte AB20A', client: 'ARTESP', description: 'Projeto demonstrativo de engenharia', status: 'active', root_count: 1, file_count: 6, created_at: '2026-11-01', updated_at: '2026-11-20' }
 ];
@@ -174,6 +179,26 @@ export async function previewInvoke<T>(command: string, args: Record<string, unk
         { id: 1, sha256: "91af8f6d1a7b9d3e4c5f6a7b8c9d00112233445566778899aabbccddeeff0099", byte_size: 4701200, modified_at: "2026-08-01T10:00:00Z", captured_at: "2026-08-01T10:05:00Z" }
       ];
       break;
+    case "list_filename_suggestions": {
+      const status = String(args.status ?? "pending");
+      const search = String(args.search ?? "").toLocaleLowerCase("pt-BR");
+      const filtered = sampleFilenameSuggestions.filter(item =>
+        (status === "all" || item.status === status) &&
+        (!search || item.filename.toLocaleLowerCase("pt-BR").includes(search) || String(item.drawing_number ?? "").toLocaleLowerCase("pt-BR").includes(search))
+      );
+      const offset = Number(args.offset ?? 0), limit = Number(args.limit ?? 100);
+      result = { items: filtered.slice(offset, offset + limit), total: filtered.length };
+      break;
+    }
+    case "review_filename_suggestion": {
+      const id = Number(args.id), decision = String(args.decision);
+      if (decision !== "accepted" && decision !== "rejected") throw new Error("Decisão inválida.");
+      const item = sampleFilenameSuggestions.find(value => value.id === id);
+      if (!item || item.status !== "pending") throw new Error("A sugestão não existe ou já foi revisada.");
+      sampleFilenameSuggestions = sampleFilenameSuggestions.map(value => value.id === id ? { ...value, status: decision as "accepted" | "rejected" } : value);
+      result = null;
+      break;
+    }
     case "list_discrepancies": {
       const search = String(args.search ?? "").toLocaleLowerCase("pt-BR");
       const filtered = sampleDiscrepancies.filter(item =>
