@@ -435,9 +435,14 @@ mod relationship_tests {
         ).unwrap();
         set_project_file_link(&connection,1,1,true,Some(discipline)).unwrap();
         assert!(set_project_file_link(&connection,2,1,true,Some(discipline)).is_err());
+        // O mesmo documento pode pertencer a outro projeto sem duplicar o arquivo.
+        set_project_file_link(&connection,2,1,true,None).unwrap();
         let (files,total) = list_project_files(&connection,1,"",Some(discipline),100,0).unwrap();
         assert_eq!(total,1);
         assert_eq!(files[0].discipline_code.as_deref(),Some("EST"));
+        let (second_project_files,second_total) = list_project_files(&connection,2,"",None,100,0).unwrap();
+        assert_eq!(second_total,1);
+        assert_eq!(second_project_files[0].filename,"A.pdf");
         delete_discipline(&connection,1,discipline).unwrap();
         let discipline_id: Option<i64> = connection.query_row(
             "SELECT discipline_id FROM project_file_links WHERE project_id=1 AND file_id=1",[],|r|r.get(0)
