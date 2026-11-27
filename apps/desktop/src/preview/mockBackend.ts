@@ -190,6 +190,17 @@ export async function previewInvoke<T>(command: string, args: Record<string, unk
       result = { file_id: fileId, character_count: samplePdfText[fileId].length, needs_ocr: false, parser_version: "preview-mock" };
       break;
     }
+    case "extract_pending_pdf_text": {
+      let processed = 0;
+      for (const file of sampleFiles.filter(item => item.extension === "pdf").slice(0, Number(args.limit ?? 50))) {
+        if (!samplePdfText[file.id]) {
+          samplePdfText[file.id] = "Projeto AB20A. Desenho EST-001. Revisão 02. Planta de formas do tabuleiro e estrutura de concreto.";
+          processed += 1;
+        }
+      }
+      result = { processed, needs_ocr: 0, errors: 0, error_details: [] };
+      break;
+    }
     case "list_file_versions":
       result = [
         { id: 2, sha256: sampleFiles[0].sha256, byte_size: sampleFiles[0].byte_size, modified_at: sampleFiles[0].modified_at, captured_at: "2026-10-12T14:32:00Z" },
