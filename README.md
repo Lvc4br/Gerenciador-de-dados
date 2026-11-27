@@ -95,7 +95,7 @@ A branch `feature/mvp-core-indexer` contém:
 ## Próximas entregas
 
 1. Estabilizar varredura, erros, reconciliação e build Windows.
-2. Implementar versões imutáveis, migrações e backup SQLite.
+2. Implementar migrações SQLite versionadas e validar backup/restauração em bases reais; armazenamento binário de versões continua pendente.
 3. Consolidar catálogo de projetos e busca FTS5.
 4. Implementar leitura de PDF/Office e visualização segura.
 5. Fazer prova de conceito DWG/DXF/IFC com validação de licença e compatibilidade.
