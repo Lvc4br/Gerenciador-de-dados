@@ -98,8 +98,7 @@ fn hash_file(path: &Path) -> Result<String, String> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
-#[tauri::command]
-fn scan_folder(app: tauri::AppHandle, folder: String) -> Result<ScanSummary, String> {
+fn scan_folder_blocking(app: tauri::AppHandle, folder: String) -> Result<ScanSummary, String> {
     let root = PathBuf::from(folder).canonicalize().map_err(|e| e.to_string())?;
     if !root.is_dir() { return Err("O caminho selecionado não é uma pasta.".into()); }
     let mut connection = open_database(&app)?;
@@ -127,7 +126,7 @@ fn scan_folder(app: tauri::AppHandle, folder: String) -> Result<ScanSummary, Str
         let path = entry.path();
         let metadata = match path.metadata() {
             Ok(value) => value,
-            Err(_) => { errors += 1; continue; }
+            Err(_) => { errors += 1; traversal_errors += 1; continue; }
         };
         let relative = match path.strip_prefix(&root) {
             Ok(value) => value.to_string_lossy().replace('\\', "/"),
@@ -208,6 +207,13 @@ fn scan_folder(app: tauri::AppHandle, folder: String) -> Result<ScanSummary, Str
         root: root.to_string_lossy().to_string(), indexed, skipped, errors,
         missing, reconciliation_complete: traversal_errors == 0, duplicate_hash_groups
     })
+}
+
+#[tauri::command]
+async fn scan_folder(app: tauri::AppHandle, folder: String) -> Result<ScanSummary, String> {
+    tauri::async_runtime::spawn_blocking(move || scan_folder_blocking(app, folder))
+        .await
+        .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
