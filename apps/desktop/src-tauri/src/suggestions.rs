@@ -14,6 +14,9 @@ pub struct SuggestionRecord {
     pub confidence: f64,
     pub status: String,
     pub applied: bool,
+    pub titleblock_internal_number: Option<String>,
+    pub titleblock_artesp_number: Option<String>,
+    pub titleblock_title: Option<String>,
     pub created_at: String,
 }
 
@@ -144,7 +147,10 @@ pub fn list(connection: &Connection, status: &str, search: &str, limit: u32, off
         params![status, search, pattern], |row| row.get(0)
     ).map_err(|e| e.to_string())?;
     let mut statement = connection.prepare(
-        "SELECT s.id,s.file_id,f.filename,f.relative_path,s.project_prefix,s.discipline_code,s.drawing_number,s.revision,s.confidence,s.status,EXISTS(SELECT 1 FROM confirmed_document_metadata m WHERE m.source_suggestion_id=s.id),s.created_at
+        "SELECT s.id,s.file_id,f.filename,f.relative_path,s.project_prefix,s.discipline_code,s.drawing_number,s.revision,s.confidence,s.status,EXISTS(SELECT 1 FROM confirmed_document_metadata m WHERE m.source_suggestion_id=s.id),
+         (SELECT dm.internal_number FROM drawing_metadata dm WHERE lower(trim(dm.filename))=lower(trim(f.filename)) ORDER BY dm.imported_at DESC LIMIT 1),
+         (SELECT dm.artesp_number FROM drawing_metadata dm WHERE lower(trim(dm.filename))=lower(trim(f.filename)) ORDER BY dm.imported_at DESC LIMIT 1),
+         (SELECT dm.candidate_title FROM drawing_metadata dm WHERE lower(trim(dm.filename))=lower(trim(f.filename)) ORDER BY dm.imported_at DESC LIMIT 1),s.created_at
          FROM filename_suggestions s JOIN files f ON f.id=s.file_id
          WHERE (?1='all' OR s.status=?1) AND (?2='' OR f.filename LIKE ?3 ESCAPE '\\' OR f.relative_path LIKE ?3 ESCAPE '\\' OR COALESCE(s.drawing_number,'') LIKE ?3 ESCAPE '\\')
          ORDER BY CASE s.status WHEN 'pending' THEN 0 ELSE 1 END, s.confidence DESC, f.filename COLLATE NOCASE
@@ -153,7 +159,7 @@ pub fn list(connection: &Connection, status: &str, search: &str, limit: u32, off
     let rows = statement.query_map(params![status, search, pattern, limit.clamp(1,500), offset], |row| Ok(SuggestionRecord {
         id: row.get(0)?, file_id: row.get(1)?, filename: row.get(2)?, relative_path: row.get(3)?,
         project_prefix: row.get(4)?, discipline_code: row.get(5)?, drawing_number: row.get(6)?,
-        revision: row.get(7)?, confidence: row.get(8)?, status: row.get(9)?, applied: row.get(10)?, created_at: row.get(11)?,
+        revision: row.get(7)?, confidence: row.get(8)?, status: row.get(9)?, applied: row.get(10)?,\n        titleblock_internal_number: row.get(11)?, titleblock_artesp_number: row.get(12)?, titleblock_title: row.get(13)?, created_at: row.get(14)?,
     })).map_err(|e| e.to_string())?;
     let mut items = Vec::new();
     for row in rows { items.push(row.map_err(|e| e.to_string())?); }
