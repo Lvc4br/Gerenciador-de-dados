@@ -81,6 +81,8 @@ A branch `feature/mvp-core-indexer` contém:
 - registro de execuções de varredura e reconciliação de arquivos ausentes, sem apagar os registros;
 - estados de arquivo indexado, ignorado, com erro ou ausente;
 - histórico de versões por hash SHA-256, tamanho e datas, sem cópia binária do conteúdo;
+- backup consistente do banco SQLite com verificação de integridade;
+- restauração de backup GED validado, criando uma cópia automática do banco atual antes da substituição;
 - indicadores de pastas, arquivos indexados e grupos de hashes duplicados;
 - Explorador conectado ao banco, com pesquisa por nome/caminho, filtro de extensão, ordenação, paginação e propriedades;
 - importação dos dois esquemas CSV reconhecidos da amostra;
