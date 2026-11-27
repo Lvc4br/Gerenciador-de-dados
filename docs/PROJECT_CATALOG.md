@@ -90,3 +90,23 @@ A seção **Projetos** terá:
 - Impedir que excluir/arquivar um projeto altere os arquivos originais.
 - Pesquisar por código e nome sem travar a interface em bibliotecas grandes.
 - Abrir banco antigo e aplicar migração sem perda de dados.
+
+
+## Estado da implementação (MVP)
+
+A primeira entrega foi implementada na branch `feature/mvp-core-indexer`:
+
+- Migração SQLite versão 4: `projects`, `project_roots` e `project_disciplines`.
+- Backend Rust: listar, criar, atualizar, arquivar/reativar, listar raízes e vincular/desvincular raízes.
+- Interface: lista pesquisável, filtro por situação, cadastro, detalhes, associação de pastas e arquivamento.
+- Prévia de navegador: dados demonstrativos mantidos em memória; não substitui o teste com SQLite real.
+- Testes Rust: normalização/duplicidade de código, compartilhamento de raiz e arquivamento.
+
+### Limitações conhecidas desta entrega
+
+- A interface ainda não oferece edição dos dados já cadastrados, embora o comando de backend exista.
+- A tabela de disciplinas foi criada, mas o cadastro e a edição de disciplinas ainda não estão expostos na interface.
+- O vínculo de documentos individuais ao projeto/disciplina ainda não foi implementado.
+- A prévia visual não persiste dados após atualizar a página; a persistência real ocorre no aplicativo Tauri.
+
+A geração do instalador Windows e os testes completos de CI precisam terminar antes de considerar esta versão validada para distribuição.
