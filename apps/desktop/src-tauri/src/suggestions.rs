@@ -36,7 +36,27 @@ pub fn ensure_schema(connection: &Connection) -> Result<(), String> {
          CREATE INDEX IF NOT EXISTS idx_filename_suggestions_status
            ON filename_suggestions(status, confidence DESC);
          CREATE INDEX IF NOT EXISTS idx_filename_suggestions_file
-           ON filename_suggestions(file_id);"
+           ON filename_suggestions(file_id);
+         CREATE TABLE IF NOT EXISTS confirmed_document_metadata (
+           file_id INTEGER PRIMARY KEY REFERENCES files(id) ON DELETE CASCADE,
+           project_prefix TEXT,
+           discipline_code TEXT,
+           drawing_number TEXT,
+           revision TEXT,
+           source_suggestion_id INTEGER REFERENCES filename_suggestions(id),
+           confirmed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+         );
+         CREATE TABLE IF NOT EXISTS metadata_audit_log (
+           id INTEGER PRIMARY KEY AUTOINCREMENT,
+           file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+           suggestion_id INTEGER REFERENCES filename_suggestions(id),
+           action TEXT NOT NULL,
+           old_values_json TEXT,
+           new_values_json TEXT NOT NULL,
+           actor TEXT NOT NULL DEFAULT 'local-user',
+           occurred_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+         );
+         CREATE INDEX IF NOT EXISTS idx_metadata_audit_file ON metadata_audit_log(file_id, occurred_at DESC);"
     ).map_err(|e| e.to_string())
 }
 
@@ -152,6 +172,63 @@ pub fn review(connection: &Connection, id: i64, status: &str) -> Result<(), Stri
     }
     Ok(())
 }
+
+
+pub fn apply_accepted(connection: &Connection, id: i64) -> Result<(), String> {
+    let transaction = connection.unchecked_transaction().map_err(|e| e.to_string())?;
+    let values: (i64, Option<String>, Option<String>, Option<String>, Option<String>, String) =
+        transaction.query_row(
+            "SELECT file_id,project_prefix,discipline_code,drawing_number,revision,status
+             FROM filename_suggestions WHERE id=?1",
+            params![id],
+            |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?,row.get(4)?,row.get(5)?))
+        ).map_err(|e| e.to_string())?;
+    if values.5 != "accepted" {
+        return Err("Somente sugestões aceitas podem ser aplicadas.".into());
+    }
+    let old: Option<String> = transaction.query_row(
+        "SELECT json_object(
+           'project_prefix',project_prefix,'discipline_code',discipline_code,
+           'drawing_number',drawing_number,'revision',revision)
+         FROM confirmed_document_metadata WHERE file_id=?1",
+        params![values.0], |row| row.get(0)
+    ).optional().map_err(|e| e.to_string())?;
+    let new_json = serde_json::json!({
+        "project_prefix": values.1, "discipline_code": values.2,
+        "drawing_number": values.3, "revision": values.4
+    }).to_string();
+    transaction.execute(
+        "INSERT INTO confirmed_document_metadata(file_id,project_prefix,discipline_code,drawing_number,revision,source_suggestion_id,confirmed_at)
+         VALUES (?1,?2,?3,?4,?5,?6,CURRENT_TIMESTAMP)
+         ON CONFLICT(file_id) DO UPDATE SET
+           project_prefix=excluded.project_prefix, discipline_code=excluded.discipline_code,
+           drawing_number=excluded.drawing_number, revision=excluded.revision,
+           source_suggestion_id=excluded.source_suggestion_id, confirmed_at=CURRENT_TIMESTAMP",
+        params![values.0,values.1,values.2,values.3,values.4,id]
+    ).map_err(|e| e.to_string())?;
+    transaction.execute(
+        "INSERT INTO metadata_audit_log(file_id,suggestion_id,action,old_values_json,new_values_json)
+         VALUES (?1,?2,?3,?4,?5)",
+        params![values.0,id,if old.is_some() {"metadata_updated"} else {"metadata_created"},old,new_json]
+    ).map_err(|e| e.to_string())?;
+    transaction.commit().map_err(|e| e.to_string())
+}
+
+    #[test]
+    fn applies_accepted_suggestion_and_writes_audit_record() {
+        let connection = Connection::open_in_memory().unwrap();
+        connection.execute_batch("PRAGMA foreign_keys=ON; CREATE TABLE files(id INTEGER PRIMARY KEY, filename TEXT);").unwrap();
+        ensure_schema(&connection).unwrap();
+        connection.execute("INSERT INTO files(id,filename) VALUES(1,'AB20A-EST-001_REV02.dwg')", []).unwrap();
+        analyze_and_store(&connection, 1, "AB20A-EST-001_REV02.dwg").unwrap();
+        review(&connection, 1, "accepted").unwrap();
+        apply_accepted(&connection, 1).unwrap();
+        let drawing: String = connection.query_row("SELECT drawing_number FROM confirmed_document_metadata WHERE file_id=1", [], |r| r.get(0)).unwrap();
+        assert_eq!(drawing, "EST-001");
+        let audit_count: i64 = connection.query_row("SELECT COUNT(*) FROM metadata_audit_log WHERE file_id=1", [], |r| r.get(0)).unwrap();
+        assert_eq!(audit_count, 1);
+        assert!(apply_accepted(&connection, 999).is_err());
+    }
 
 #[cfg(test)]
 mod tests {
