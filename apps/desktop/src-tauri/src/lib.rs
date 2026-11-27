@@ -733,7 +733,7 @@ const MAX_PDF_BYTES: u64 = 200 * 1024 * 1024;
 const MAX_PDF_TEXT_CHARACTERS: usize = 10_000_000;
 
 fn extract_pdf_text_blocking(app: tauri::AppHandle, file_id: i64) -> Result<serde_json::Value, String> {
-    let connection = open_database(&app)?;
+    let mut connection = open_database(&app)?;
     let (root_path, relative_path, extension, expected_hash): (String, String, String, String) =
         connection.query_row(
             "SELECT r.path, f.relative_path, f.extension, f.sha256
@@ -776,7 +776,8 @@ fn extract_pdf_text_blocking(app: tauri::AppHandle, file_id: i64) -> Result<serd
     }
     let (drawing_number, revision, candidate_title, metadata_confidence) =
         extract_pdf_metadata_candidates(&content)?;
-    connection.execute(
+    let transaction = connection.transaction().map_err(|e| e.to_string())?;
+    transaction.execute(
         "INSERT INTO extracted_document_text(
            file_id,sha256,content,character_count,parser_version,page_count,pages_with_text,
            drawing_number,revision,candidate_title,metadata_confidence
@@ -792,13 +793,13 @@ fn extract_pdf_text_blocking(app: tauri::AppHandle, file_id: i64) -> Result<serd
     ).map_err(|e| format!("Não foi possível salvar o texto extraído: {e}"))?;
 
     if drawing_number.is_some() || revision.is_some() || candidate_title.is_some() {
-        let has_filename_suggestion: bool = connection.query_row(
+        let has_filename_suggestion: bool = transaction.query_row(
             "SELECT EXISTS(SELECT 1 FROM filename_suggestions WHERE file_id=?1 AND parser_version='1')",
             params![file_id], |row| row.get(0)
         ).map_err(|e| e.to_string())?;
         if !has_filename_suggestion {
             let discipline = drawing_number.as_deref().and_then(|value| value.split('-').next());
-            connection.execute(
+            transaction.execute(
                 "INSERT INTO filename_suggestions(
                    file_id,discipline_code,drawing_number,revision,confidence,source,parser_version
                  ) VALUES (?1,?2,?3,?4,?5,'pdf_content','pdf-content-1')
@@ -821,6 +822,7 @@ fn extract_pdf_text_blocking(app: tauri::AppHandle, file_id: i64) -> Result<serd
             ).map_err(|e| format!("Não foi possível registrar a sugestão extraída do PDF: {e}"))?;
         }
     }
+    transaction.commit().map_err(|e| format!("Não foi possível confirmar os dados extraídos: {e}"))?;
     Ok(serde_json::json!({
         "file_id": file_id,
         "character_count": character_count,
