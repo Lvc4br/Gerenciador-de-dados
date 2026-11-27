@@ -568,7 +568,12 @@ fn list_files(
         "SELECT COUNT(*) FROM files f
          WHERE (?1 = '' OR
            (?2 != '' AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?2)) OR
-           (?9 = 1 AND ?2 != '' AND f.id IN (SELECT rowid FROM document_text_fts WHERE document_text_fts MATCH ?2)) OR
+           (?9 = 1 AND ?2 != '' AND f.id IN (
+             SELECT document_text_fts.rowid FROM document_text_fts
+             JOIN extracted_document_text x ON x.file_id=document_text_fts.rowid
+             JOIN files current_file ON current_file.id=x.file_id
+             WHERE document_text_fts MATCH ?2 AND x.sha256=current_file.sha256
+           )) OR
            (?2 = '' AND (f.filename LIKE ?3 ESCAPE '\\' OR f.relative_path LIKE ?3 ESCAPE '\\')))
          AND (?4 IS NULL OR lower(f.extension) = ?4)
          AND (?5 IS NULL OR EXISTS (
@@ -605,7 +610,12 @@ fn list_files(
          FROM files f JOIN scan_roots r ON r.id = f.root_id
          WHERE (?1 = '' OR
            (?2 != '' AND f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?2)) OR
-           (?9 = 1 AND ?2 != '' AND f.id IN (SELECT rowid FROM document_text_fts WHERE document_text_fts MATCH ?2)) OR
+           (?9 = 1 AND ?2 != '' AND f.id IN (
+             SELECT document_text_fts.rowid FROM document_text_fts
+             JOIN extracted_document_text x ON x.file_id=document_text_fts.rowid
+             JOIN files current_file ON current_file.id=x.file_id
+             WHERE document_text_fts MATCH ?2 AND x.sha256=current_file.sha256
+           )) OR
            (?2 = '' AND (f.filename LIKE ?3 ESCAPE '\\' OR f.relative_path LIKE ?3 ESCAPE '\\')))
            AND (?4 IS NULL OR lower(f.extension) = ?4)
            AND (?5 IS NULL OR EXISTS (
@@ -681,7 +691,7 @@ fn extract_pdf_text_blocking(app: tauri::AppHandle, file_id: i64) -> Result<serd
     }
     connection.execute(
         "INSERT INTO extracted_document_text(file_id,sha256,content,character_count,parser_version)
-         VALUES (?1,?2,?3,?4,'pdf-extract-0.7')
+         VALUES (?1,?2,?3,?4,'pdf-extract-0.12.1')
          ON CONFLICT(file_id) DO UPDATE SET sha256=excluded.sha256,
            content=excluded.content, character_count=excluded.character_count,
            parser_version=excluded.parser_version, extracted_at=CURRENT_TIMESTAMP",
@@ -691,7 +701,7 @@ fn extract_pdf_text_blocking(app: tauri::AppHandle, file_id: i64) -> Result<serd
         "file_id": file_id,
         "character_count": character_count,
         "needs_ocr": normalized.trim().is_empty(),
-        "parser_version": "pdf-extract-0.7"
+        "parser_version": "pdf-extract-0.12.1"
     }))
 }
 
