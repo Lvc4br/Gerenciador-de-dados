@@ -184,7 +184,11 @@ export async function previewInvoke<T>(command: string, args: Record<string, unk
         items: filtered.slice(offset, offset + limit).map(file => ({
           ...file,
           content_snippet: searchInContent && samplePdfText[file.id]?.toLocaleLowerCase("pt-BR").includes(search)
-            ? samplePdfText[file.id] : null
+            ? samplePdfText[file.id] : null,
+          pdf_text_indexed: Boolean(samplePdfText[file.id]),
+          pdf_text_characters: samplePdfText[file.id]?.length ?? null,
+          pdf_page_count: samplePdfText[file.id] ? 2 : null,
+          pdf_extracted_at: samplePdfText[file.id] ? "2026-11-27T12:00:00Z" : null
         })),
         total: filtered.length
       };
