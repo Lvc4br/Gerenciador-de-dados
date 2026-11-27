@@ -647,6 +647,61 @@ fn list_files(
     Ok(FilePage { items, total })
 }
 
+const MAX_PDF_BYTES: u64 = 200 * 1024 * 1024;
+const MAX_PDF_TEXT_CHARACTERS: usize = 10_000_000;
+
+fn extract_pdf_text_blocking(app: tauri::AppHandle, file_id: i64) -> Result<serde_json::Value, String> {
+    let connection = open_database(&app)?;
+    let (root_path, relative_path, extension, expected_hash): (String, String, String, String) =
+        connection.query_row(
+            "SELECT r.path, f.relative_path, f.extension, f.sha256
+             FROM files f JOIN scan_roots r ON r.id=f.root_id WHERE f.id=?1 AND f.status='indexed'",
+            params![file_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        ).map_err(|error| format!("Documento não encontrado ou não está indexado: {error}"))?;
+    if extension.to_lowercase() != "pdf" {
+        return Err("A extração de conteúdo está disponível apenas para arquivos PDF.".into());
+    }
+    let file_path = PathBuf::from(root_path).join(relative_path);
+    let metadata = std::fs::metadata(&file_path).map_err(|e| format!("Não foi possível acessar o PDF: {e}"))?;
+    if metadata.len() > MAX_PDF_BYTES {
+        return Err("PDF excede o limite de 200 MB para extração.".into());
+    }
+    let current_hash = hash_file(&file_path)?;
+    if current_hash != expected_hash {
+        return Err("O PDF foi alterado desde a última varredura. Execute uma nova indexação antes de extrair.".into());
+    }
+    let path_string = file_path.to_string_lossy().to_string();
+    let extracted = pdf_extract::extract_text(&path_string)
+        .map_err(|e| format!("Não foi possível extrair o texto do PDF: {e}"))?;
+    let normalized = extracted.replace("\r\n", "\n").replace('\r', "\n");
+    let character_count = normalized.chars().count();
+    if character_count > MAX_PDF_TEXT_CHARACTERS {
+        return Err(format!("Texto extraído excede o limite de {MAX_PDF_TEXT_CHARACTERS} caracteres."));
+    }
+    connection.execute(
+        "INSERT INTO extracted_document_text(file_id,sha256,content,character_count,parser_version)
+         VALUES (?1,?2,?3,?4,'pdf-extract-0.7')
+         ON CONFLICT(file_id) DO UPDATE SET sha256=excluded.sha256,
+           content=excluded.content, character_count=excluded.character_count,
+           parser_version=excluded.parser_version, extracted_at=CURRENT_TIMESTAMP",
+        params![file_id, expected_hash, normalized, character_count as i64]
+    ).map_err(|e| format!("Não foi possível salvar o texto extraído: {e}"))?;
+    Ok(serde_json::json!({
+        "file_id": file_id,
+        "character_count": character_count,
+        "needs_ocr": normalized.trim().is_empty(),
+        "parser_version": "pdf-extract-0.7"
+    }))
+}
+
+#[tauri::command]
+async fn extract_pdf_text(app: tauri::AppHandle, file_id: i64) -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(move || extract_pdf_text_blocking(app, file_id))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
 #[derive(Serialize)]
 struct FileVersionRecord {
     id: i64,
@@ -886,7 +941,7 @@ fn set_project_file_link(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![scan_folder, get_dashboard_stats, create_database_backup, restore_database_backup, list_files, list_file_versions, list_discrepancies, list_filename_suggestions, review_filename_suggestion, apply_accepted_filename_suggestion, list_projects, create_project, update_project, archive_project, list_project_roots, set_project_root_link, list_project_disciplines, save_project_discipline, delete_project_discipline, list_project_files, set_project_file_link])
+        .invoke_handler(tauri::generate_handler![scan_folder, get_dashboard_stats, create_database_backup, restore_database_backup, list_files, extract_pdf_text, list_file_versions, list_discrepancies, list_filename_suggestions, review_filename_suggestion, apply_accepted_filename_suggestion, list_projects, create_project, update_project, archive_project, list_project_roots, set_project_root_link, list_project_disciplines, save_project_discipline, delete_project_discipline, list_project_files, set_project_file_link])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar o GED Desktop");
 }
