@@ -76,6 +76,8 @@ function ExplorerPanel() {
   const [searchInContent, setSearchInContent] = useState(false);
   const [extractingPdf, setExtractingPdf] = useState(false);
   const [contentNotice, setContentNotice] = useState('');
+  const [extractingBatch, setExtractingBatch] = useState(false);
+  const [batchNotice, setBatchNotice] = useState('');
   const pageSize = 100;
 
   useEffect(() => {
@@ -143,7 +145,20 @@ function ExplorerPanel() {
     <section className="explorer">
       <div className="page-heading explorer-heading">
         <div><div className="eyebrow">BIBLIOTECA LOCAL</div><h1>Explorador de arquivos</h1><p>Pesquise e inspecione os arquivos registrados nas pastas indexadas.</p></div>
-        <button className="secondary-button" onClick={() => void loadFiles()} disabled={loading}><RefreshCw size={15} /> Atualizar</button>
+        <div className="heading-actions">
+          <button className="secondary-button" disabled={extractingBatch} onClick={async () => {
+            setExtractingBatch(true); setBatchNotice(''); setError('');
+            try {
+              const result = await invoke<{processed:number;needs_ocr:number;errors:number}>('extract_pending_pdf_text', { limit: 50 });
+              setBatchNotice(result.processed + ' PDF(s) processado(s), ' + result.needs_ocr + ' sem texto selecionável e ' + result.errors + ' erro(s).');
+              if (searchInContent) await loadFiles();
+            } catch (reason) { setError(String(reason)); }
+            finally { setExtractingBatch(false); }
+          }}>
+            <FileSearch size={15} /> {extractingBatch ? 'Extraindo PDFs...' : 'Extrair PDFs pendentes'}
+          </button>
+          <button className="secondary-button" onClick={() => void loadFiles()} disabled={loading}><RefreshCw size={15} /> Atualizar</button>
+        </div>
       </div>
       <div className="explorer-toolbar">
         <label className="explorer-search"><Search size={16} /><input value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Nome do arquivo ou caminho..." /></label>
@@ -158,6 +173,7 @@ function ExplorerPanel() {
         <button className="sort-button" title="Inverter ordenação" onClick={() => setAscending(value => !value)}><ArrowUpDown size={16} /> {ascending ? 'Crescente' : 'Decrescente'}</button>
       </div>
       <div className="explorer-summary"><span>{loading ? 'Consultando biblioteca...' : data.total.toLocaleString('pt-BR') + ' arquivo(s) encontrado(s)'}</span><span>Exibindo até 100 por página</span></div>
+      {batchNotice && <div className="notice" role="status">{batchNotice}</div>}
       {error && <div className="notice error">{error}</div>}
       <div className="explorer-layout">
         <div className="file-table-wrap">
