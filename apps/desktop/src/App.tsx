@@ -4,7 +4,8 @@ import { open } from "@tauri-apps/plugin-dialog";
 import {
   Archive, ArrowDownToLine, Bell, BookOpen, ChevronRight,
   CircleAlert, Clock3, FileCheck2, FileSearch, Files, Folder, FolderOpen,
-  HardDrive, LayoutDashboard, Search, Settings2, ShieldCheck, SlidersHorizontal
+  HardDrive, LayoutDashboard, Search, Settings2, ShieldCheck, SlidersHorizontal,
+  FileText, RefreshCw, ChevronLeft, ArrowUpDown
 } from "lucide-react";
 
 type Section = "Visão geral" | "Projetos" | "Explorador" | "Divergências" | "Exportações";
@@ -20,6 +21,95 @@ const navigation: { label: Section; icon: typeof LayoutDashboard }[] = [
 ];
 
 const emptyStats: DashboardStats = { root_count: 0, file_count: 0, duplicate_hash_groups: 0 };
+
+
+type FileRecord = {
+  id: number; filename: string; relative_path: string; extension: string;
+  byte_size: number; modified_at: string; sha256: string; root_path: string;
+};
+type FilePage = { items: FileRecord[]; total: number };
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return String(bytes) + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+}
+
+function ExplorerPanel() {
+  const [search, setSearch] = useState('');
+  const [extension, setExtension] = useState('');
+  const [sortBy, setSortBy] = useState('path');
+  const [ascending, setAscending] = useState(true);
+  const [page, setPage] = useState(0);
+  const [data, setData] = useState<FilePage>({ items: [], total: 0 });
+  const [selected, setSelected] = useState<FileRecord | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const pageSize = 100;
+
+  async function loadFiles() {
+    setLoading(true); setError('');
+    try {
+      const result = await invoke<FilePage>('list_files', {
+        search, extension, sortBy, ascending, limit: pageSize, offset: page * pageSize
+      });
+      setData(result);
+      setSelected(current => current && result.items.some(item => item.id === current.id)
+        ? current : (result.items[0] ?? null));
+    } catch (reason) { setError(String(reason)); }
+    finally { setLoading(false); }
+  }
+
+  useEffect(() => { void loadFiles(); }, [search, extension, sortBy, ascending, page]);
+
+  const totalPages = Math.max(1, Math.ceil(data.total / pageSize));
+  return (
+    <section className="explorer">
+      <div className="page-heading explorer-heading">
+        <div><div className="eyebrow">BIBLIOTECA LOCAL</div><h1>Explorador de arquivos</h1><p>Pesquise e inspecione os arquivos registrados nas pastas indexadas.</p></div>
+        <button className="secondary-button" onClick={() => void loadFiles()} disabled={loading}><RefreshCw size={15} /> Atualizar</button>
+      </div>
+      <div className="explorer-toolbar">
+        <label className="explorer-search"><Search size={16} /><input value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Nome do arquivo ou caminho..." /></label>
+        <label className="filter-control"><span>Extensão</span><input value={extension} onChange={e => { setExtension(e.target.value); setPage(0); }} placeholder="ex.: pdf, dwg" /></label>
+        <label className="filter-control"><span>Ordenar por</span><select value={sortBy} onChange={e => setSortBy(e.target.value)}><option value="path">Caminho</option><option value="filename">Nome</option><option value="extension">Extensão</option><option value="size">Tamanho</option><option value="modified">Modificação</option></select></label>
+        <button className="sort-button" title="Inverter ordenação" onClick={() => setAscending(value => !value)}><ArrowUpDown size={16} /> {ascending ? 'Crescente' : 'Decrescente'}</button>
+      </div>
+      <div className="explorer-summary"><span>{loading ? 'Consultando biblioteca...' : data.total.toLocaleString('pt-BR') + ' arquivo(s) encontrado(s)'}</span><span>Exibindo até 100 por página</span></div>
+      {error && <div className="notice error">{error}</div>}
+      <div className="explorer-layout">
+        <div className="file-table-wrap">
+          <table className="file-table">
+            <thead><tr><th>Nome</th><th>Tipo</th><th>Tamanho</th><th>Última modificação</th></tr></thead>
+            <tbody>
+              {data.items.map(file => <tr key={file.id} className={selected?.id === file.id ? 'selected' : ''} onClick={() => setSelected(file)}>
+                <td><div className="file-name"><FileText size={16} /><div><b>{file.filename}</b><small>{file.relative_path}</small></div></div></td>
+                <td><span className="file-ext">{file.extension ? file.extension.toUpperCase() : 'SEM TIPO'}</span></td>
+                <td>{formatBytes(file.byte_size)}</td>
+                <td>{file.modified_at ? new Date(file.modified_at).toLocaleDateString('pt-BR') : '—'}</td>
+              </tr>)}
+              {!loading && data.items.length === 0 && <tr><td colSpan={4} className="table-empty">Nenhum arquivo encontrado. Importe uma pasta na Visão geral para começar.</td></tr>}
+            </tbody>
+          </table>
+          <div className="pagination"><span>Página {page + 1} de {totalPages}</span><div><button disabled={page === 0} onClick={() => setPage(value => Math.max(0, value - 1))}><ChevronLeft size={15} /> Anterior</button><button disabled={page + 1 >= totalPages} onClick={() => setPage(value => Math.min(totalPages - 1, value + 1))}>Próxima <ChevronRight size={15} /></button></div></div>
+        </div>
+        <aside className="file-details">
+          <div className="details-heading"><FileText size={18} /><b>Propriedades</b></div>
+          {selected ? <>
+            <h3>{selected.filename}</h3>
+            <div className="detail-row"><span>Localização</span><b>{selected.root_path}\\{selected.relative_path}</b></div>
+            <div className="detail-row"><span>Extensão</span><b>{selected.extension || '—'}</b></div>
+            <div className="detail-row"><span>Tamanho</span><b>{formatBytes(selected.byte_size)}</b></div>
+            <div className="detail-row"><span>Modificado</span><b>{selected.modified_at ? new Date(selected.modified_at).toLocaleString('pt-BR') : '—'}</b></div>
+            <div className="detail-row hash-row"><span>SHA-256</span><code>{selected.sha256}</code></div>
+            <p className="detail-note">Os dados acima foram registrados na indexação. A visualização do conteúdo e a extração de metadados serão adicionadas em uma próxima etapa.</p>
+          </> : <p className="detail-note">Selecione um arquivo na lista para consultar suas propriedades.</p>}
+        </aside>
+      </div>
+    </section>
+  );
+}
 
 function App() {
   const [section, setSection] = useState<Section>("Visão geral");
@@ -88,7 +178,7 @@ function App() {
         </header>
 
         <div className="page-content">
-          {section === "Visão geral" ? (
+          {section === "Explorador" ? (<ExplorerPanel />) : section === "Visão geral" ? (
             <>
               <div className="page-heading">
                 <div><div className="eyebrow">CENTRAL DE CONTROLE</div><h1>Visão geral</h1><p>Encontre, organize e analise o conhecimento dos projetos da sua engenharia.</p></div>
