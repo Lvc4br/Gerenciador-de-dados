@@ -16,6 +16,8 @@ struct ScanSummary {
     skipped: u64,
     errors: u64,
     duplicate_hash_groups: u64,
+    drawing_metadata_count: u64,
+    discrepancy_count: u64,
 }
 
 #[derive(Serialize)]
@@ -157,7 +159,9 @@ fn get_dashboard_stats(app: tauri::AppHandle) -> Result<DashboardStats, String> 
         "SELECT COUNT(*) FROM (SELECT sha256 FROM files GROUP BY sha256 HAVING COUNT(*) > 1)",
         [], |row| row.get(0)
     ).map_err(|e| e.to_string())?;
-    Ok(DashboardStats { root_count, file_count, duplicate_hash_groups })
+    let drawing_metadata_count = connection.query_row("SELECT COUNT(*) FROM drawing_metadata", [], |row| row.get(0)).map_err(|e| e.to_string())?;
+    let discrepancy_count = connection.query_row("SELECT COUNT(*) FROM drawing_discrepancies", [], |row| row.get(0)).map_err(|e| e.to_string())?;
+    Ok(DashboardStats { root_count, file_count, duplicate_hash_groups, drawing_metadata_count, discrepancy_count })
 }
 
 
