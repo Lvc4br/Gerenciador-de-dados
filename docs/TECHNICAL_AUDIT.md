@@ -212,3 +212,12 @@ Não tratar hash igual como sinônimo de mesmo projeto. Hash igual significa con
 A stack atual deve ser mantida, com uma decisão arquitetural clara: **Rust é o núcleo desktop e de indexação local; Python é o motor de extração/análise; React/TypeScript é a interface; SQLite é o banco embarcado**.
 
 O maior risco neste momento não é escolher outra linguagem. É ampliar funcionalidades antes de estabilizar indexação, versões, proveniência, recuperação de dados, testes Windows e compatibilidade/licenças CAD. A próxima entrega deve priorizar a Fase 0, antes de começar OCR ou comparação DWG.
+
+
+## Atualização de implementação — 27/11/2026
+
+- O banco SQLite agora registra as migrações aplicadas em `schema_migrations`, com baseline para bancos existentes e uma segunda migração de índices voltados à consulta do catálogo.
+- A migração de índices é transacional e idempotente; a abertura do GED continua compatível com bancos criados por versões anteriores do MVP.
+- A criação de backup agora verifica também as relações por `PRAGMA foreign_key_check`; a cópia de segurança pré-restauração usa timestamp em milissegundos para reduzir colisões de nome.
+- FTS5 ainda não está implementado. Antes de ativá-lo, será necessário validar a compilação SQLite usada no instalador Windows e medir tamanho do índice, tempo de indexação e desempenho em hardware modesto.
+- Não há ainda teste funcional de migração com banco legado real nem execução confirmada do CI para este commit.
