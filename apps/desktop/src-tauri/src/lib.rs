@@ -141,6 +141,7 @@ fn open_database(app: &tauri::AppHandle) -> Result<Connection, String> {
     apply_fts_migration(&connection)?;
     apply_document_text_migration(&connection)?;
     apply_pdf_page_count_migration(&connection)?;
+    apply_pdf_metadata_migration(&connection)?;
     csv_metadata::ensure_schema(&connection)?;
     projects::ensure_schema(&connection)?;
     projects::ensure_relations_schema(&connection)?;
@@ -239,6 +240,26 @@ fn apply_pdf_page_count_migration(connection: &Connection) -> Result<(), String>
     ).map_err(|e| format!("Não foi possível ampliar os metadados de extração PDF: {e}"))?;
     transaction.execute(
         "INSERT INTO schema_migrations(version, name) VALUES (7, 'pdf_extracted_page_counts')",
+        []
+    ).map_err(|e| e.to_string())?;
+    transaction.commit().map_err(|e| e.to_string())
+}
+
+fn apply_pdf_metadata_migration(connection: &Connection) -> Result<(), String> {
+    let already_applied: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM schema_migrations WHERE version=8",
+        [], |row| row.get(0)
+    ).map_err(|e| e.to_string())?;
+    if already_applied > 0 { return Ok(()); }
+    let transaction = connection.unchecked_transaction().map_err(|e| e.to_string())?;
+    transaction.execute_batch(
+        "ALTER TABLE extracted_document_text ADD COLUMN drawing_number TEXT;
+         ALTER TABLE extracted_document_text ADD COLUMN revision TEXT;
+         ALTER TABLE extracted_document_text ADD COLUMN candidate_title TEXT;
+         ALTER TABLE extracted_document_text ADD COLUMN metadata_confidence REAL NOT NULL DEFAULT 0;"
+    ).map_err(|e| format!("Não foi possível preparar os metadados candidatos do PDF: {e}"))?;
+    transaction.execute(
+        "INSERT INTO schema_migrations(version, name) VALUES (8, 'pdf_metadata_candidates')",
         []
     ).map_err(|e| e.to_string())?;
     transaction.commit().map_err(|e| e.to_string())
@@ -676,6 +697,38 @@ fn list_files(
     Ok(FilePage { items, total })
 }
 
+fn extract_pdf_metadata_candidates(text: &str) -> Result<(Option<String>, Option<String>, Option<String>, f64), String> {
+    let drawing_pattern = regex::Regex::new(r"(?i)\\b([A-Z]{2,5})[-_ ]?(\\d{2,5})\\b")
+        .map_err(|e| e.to_string())?;
+    let revision_pattern = regex::Regex::new(r"(?i)\\bREV(?:IS[ÃA]O)?[ .:_-]*([A-Z0-9]{1,4})\\b")
+        .map_err(|e| e.to_string())?;
+    let title_pattern = regex::Regex::new(r"(?im)^\\s*(?:T[IÍ]TULO|TITULO|DESCRI[CÇ][AÃ]O|NOME\\s+DO\\s+DESENHO)\\s*[:\\-]\\s*(.{5,180})\\s*$")
+        .map_err(|e| e.to_string())?;
+
+    let drawing_number = drawing_pattern.captures(text).and_then(|captures| {
+        let prefix = captures.get(1)?.as_str().to_ascii_uppercase();
+        if ["REV", "ISO", "ABNT", "NBR"].contains(&prefix.as_str()) { return None; }
+        let number = captures.get(2)?.as_str();
+        Some(format!("{prefix}-{number}"))
+    });
+    let revision = revision_pattern.captures(text)
+        .and_then(|captures| captures.get(1).map(|value| value.as_str().to_ascii_uppercase()));
+    let candidate_title = title_pattern.captures(text)
+        .and_then(|captures| captures.get(1).map(|value| value.as_str().trim().to_string()))
+        .filter(|value| !value.is_empty());
+    let confidence = match (drawing_number.is_some(), revision.is_some(), candidate_title.is_some()) {
+        (true, true, true) => 0.86,
+        (true, true, false) => 0.82,
+        (true, false, true) => 0.76,
+        (true, false, false) => 0.68,
+        (false, true, true) => 0.48,
+        (false, true, false) => 0.35,
+        (false, false, true) => 0.40,
+        (false, false, false) => 0.0,
+    };
+    Ok((drawing_number, revision, candidate_title, confidence))
+}
+
 const MAX_PDF_BYTES: u64 = 200 * 1024 * 1024;
 const MAX_PDF_TEXT_CHARACTERS: usize = 10_000_000;
 
@@ -721,14 +774,21 @@ fn extract_pdf_text_blocking(app: tauri::AppHandle, file_id: i64) -> Result<serd
             content.push_str(&format!("\n\n--- Página {} ---\n{}", index + 1, page_text));
         }
     }
+    let (drawing_number, revision, candidate_title, metadata_confidence) =
+        extract_pdf_metadata_candidates(&content)?;
     connection.execute(
-        "INSERT INTO extracted_document_text(file_id,sha256,content,character_count,parser_version,page_count,pages_with_text)
-         VALUES (?1,?2,?3,?4,'pdf-extract-0.12.1',?5,?6)
+        "INSERT INTO extracted_document_text(
+           file_id,sha256,content,character_count,parser_version,page_count,pages_with_text,
+           drawing_number,revision,candidate_title,metadata_confidence
+         ) VALUES (?1,?2,?3,?4,'pdf-extract-0.12.1',?5,?6,?7,?8,?9,?10)
          ON CONFLICT(file_id) DO UPDATE SET sha256=excluded.sha256,
            content=excluded.content, character_count=excluded.character_count,
            parser_version=excluded.parser_version, page_count=excluded.page_count,
-           pages_with_text=excluded.pages_with_text, extracted_at=CURRENT_TIMESTAMP",
-        params![file_id, expected_hash, content, character_count as i64, page_count as i64, pages_with_text as i64]
+           pages_with_text=excluded.pages_with_text, drawing_number=excluded.drawing_number,
+           revision=excluded.revision, candidate_title=excluded.candidate_title,
+           metadata_confidence=excluded.metadata_confidence, extracted_at=CURRENT_TIMESTAMP",
+        params![file_id, expected_hash, content, character_count as i64, page_count as i64,
+                pages_with_text as i64, drawing_number, revision, candidate_title, metadata_confidence]
     ).map_err(|e| format!("Não foi possível salvar o texto extraído: {e}"))?;
     Ok(serde_json::json!({
         "file_id": file_id,
@@ -736,6 +796,10 @@ fn extract_pdf_text_blocking(app: tauri::AppHandle, file_id: i64) -> Result<serd
         "page_count": page_count,
         "pages_with_text": pages_with_text,
         "needs_ocr": pages_with_text == 0,
+        "drawing_number": drawing_number,
+        "revision": revision,
+        "candidate_title": candidate_title,
+        "metadata_confidence": metadata_confidence,
         "parser_version": "pdf-extract-0.12.1"
     }))
 }
