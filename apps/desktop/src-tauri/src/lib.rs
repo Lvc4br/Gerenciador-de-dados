@@ -1236,7 +1236,7 @@ mod backup_tests {
     #[test]
     fn pdf_metadata_candidates_do_not_treat_iso_standard_as_drawing_number() {
         let (drawing, revision, title, confidence) =
-            extract_pdf_metadata_candidates("Norma ISO-9001 e texto genérico").expect("parse PDF metadata");
+            extract_pdf_metadata_candidates("Norma ISO-9001, rodovia BR-101 e texto genérico").expect("parse PDF metadata");
         assert_eq!(drawing, None);
         assert_eq!(revision, None);
         assert_eq!(title, None);
