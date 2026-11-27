@@ -1071,6 +1071,42 @@ mod backup_tests {
     }
 
     #[test]
+    fn pdf_extract_reads_text_by_page_from_a_real_pdf_file() {
+        let path = std::env::temp_dir().join(format!("ged-pdf-fixture-{}.pdf", std::process::id()));
+        let stream = "BT /F1 12 Tf 50 700 Td (EST-001 REV02) Tj ET";
+        let mut pdf = String::from("%PDF-1.4\n");
+        let mut offsets = vec![0usize];
+        let objects = [
+            "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n".to_string(),
+            "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n".to_string(),
+            "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj\n".to_string(),
+            "4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n".to_string(),
+            format!("5 0 obj << /Length {} >> stream\n{}\nendstream endobj\n", stream.len(), stream),
+        ];
+        for object in objects {
+            offsets.push(pdf.len());
+            pdf.push_str(&object);
+        }
+        let xref_offset = pdf.len();
+        pdf.push_str(&format!("xref\n0 {}\n", offsets.len()));
+        pdf.push_str("0000000000 65535 f \n");
+        for offset in offsets.iter().skip(1) {
+            pdf.push_str(&format!("{:010} 00000 n \n", offset));
+        }
+        pdf.push_str(&format!(
+            "trailer << /Size {} /Root 1 0 R >>\nstartxref\n{}\n%%EOF\n",
+            offsets.len(), xref_offset
+        ));
+        std::fs::write(&path, pdf).expect("write test PDF");
+
+        let pages = pdf_extract::extract_text_by_pages(&path).expect("extract PDF pages");
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(pages.len(), 1);
+        assert!(pages[0].contains("EST-001"));
+        assert!(pages[0].contains("REV02"));
+    }
+
+    #[test]
     fn document_text_migration_indexes_and_updates_pdf_content() {
         let connection = Connection::open_in_memory().expect("open database");
         connection.execute_batch(
