@@ -93,3 +93,16 @@ Preferir pipe/socket local quando viável. Segredos não devem aparecer em logs.
 - Testar caminhos longos, caracteres acentuados, rede indisponível, disco removido, arquivos duplicados e corrompidos.
 - Testar cancelamento, retomada e encerramento inesperado.
 - Testar instalação limpa e atualização no Windows.
+
+
+## 9. Sugestões de metadados pelo nome do arquivo (desktop atual)
+
+O fluxo de revisão inicial é executado no backend Rust/Tauri, diretamente no banco SQLite do desktop. O parser Python/CLI continua disponível para diagnóstico e desenvolvimento, mas não é a fonte de dados da tela desktop.
+
+Comandos Tauri:
+- `list_filename_suggestions(status, search, limit, offset)`: retorna sugestões com nome e caminho do arquivo, projeto provável, disciplina, número, revisão, confiança e situação.
+- `review_filename_suggestion(id, decision)`: registra `accepted` ou `rejected`; somente sugestões pendentes podem ser revisadas.
+
+A tabela `filename_suggestions` possui chave única por arquivo e versão do parser. Reindexar com os mesmos valores preserva a decisão humana; quando os valores extraídos mudam, a situação volta para `pending`. A análise usa somente o nome do arquivo e nunca abre ou altera o original.
+
+A aceitação atual registra a decisão, mas não promove os campos para os metadados oficiais nem cria associação automática a projeto. Essa promoção exige uma etapa própria de comparação com carimbo/cadastro e trilha de auditoria.
