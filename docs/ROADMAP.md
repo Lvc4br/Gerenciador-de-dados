@@ -56,6 +56,7 @@
 - O Explorador permite extrair um PDF selecionado ou processar PDFs pendentes em lotes limitados, e habilitar a busca pelo conteúdo já extraído.
 - O backend confere o SHA-256 antes da extração, limita PDFs a 200 MB, 5.000 páginas e textos extraídos a 10 milhões de caracteres, e executa a leitura fora da thread principal.
 - PDFs sem texto selecionável são identificados como candidatos a OCR; OCR ainda não está incluído.
+- Quando há padrões reconhecíveis no texto, o parser sugere número de desenho, revisão e título; essas propostas são exibidas na tela Revisão ao lado dos dados do nome e do carimbo, sem confirmação automática.
 - O módulo Python/CLI criado anteriormente permanece como protótipo experimental independente e não é usado pelo executável desktop.
 
 - A comparação automatizada com os dados do carimbo e a aplicação controlada de valores aceitos permanecem etapas futuras.
