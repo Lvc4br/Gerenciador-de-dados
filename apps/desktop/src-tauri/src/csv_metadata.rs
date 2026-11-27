@@ -56,6 +56,27 @@ pub fn import_metadata_csv(
     source_file_id: i64,
     path: &Path,
 ) -> Result<usize, String> {
+    connection.execute_batch("SAVEPOINT ged_csv_import").map_err(|e| e.to_string())?;
+    let result = import_metadata_csv_inner(connection, source_file_id, path);
+    match result {
+        Ok(imported) => {
+            connection.execute_batch("RELEASE SAVEPOINT ged_csv_import").map_err(|e| e.to_string())?;
+            Ok(imported)
+        }
+        Err(error) => {
+            let _ = connection.execute_batch(
+                "ROLLBACK TO SAVEPOINT ged_csv_import; RELEASE SAVEPOINT ged_csv_import"
+            );
+            Err(error)
+        }
+    }
+}
+
+fn import_metadata_csv_inner(
+    connection: &Connection,
+    source_file_id: i64,
+    path: &Path,
+) -> Result<usize, String> {
     let bytes = fs::read(path).map_err(|e| e.to_string())?;
     let first_line = bytes.split(|byte| *byte == b'\n').next().unwrap_or(&[]);
     let semicolons = first_line.iter().filter(|byte| **byte == b';').count();
